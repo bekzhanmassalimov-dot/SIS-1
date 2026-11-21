@@ -1,0 +1,2990 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Sıqyrshy — Магическая Дуэль</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0e1118;
+      --panel-bg: rgba(16, 21, 32, 0.78);
+      --panel-border: rgba(212, 175, 55, 0.35);
+      --fire-primary: #ff4d2e;
+      --fire-glow: rgba(255, 77, 46, 0.55);
+      --earth-primary: #2998ff;
+      --earth-glow: rgba(41, 152, 255, 0.55);
+      --gold: #f3c65f;
+      --text-main: #f4f1ea;
+      --text-muted: #9aa5b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      touch-action: none;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg-dark);
+      font-family: 'Inter', sans-serif;
+      color: var(--text-main);
+    }
+
+    #gameCanvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* HUD LAYER */
+    #hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    /* TOP LEFT: Stats (Health, Mana, Stamina) */
+    .stats-panel {
+      position: absolute;
+      top: max(12px, env(safe-area-inset-top));
+      left: max(14px, env(safe-area-inset-left));
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 14px;
+      padding: 10px 13px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+      min-width: 168px;
+    }
+
+    .stat-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      color: var(--text-muted);
+      min-width: 84px;
+    }
+
+    .stat-cells {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+    }
+
+    .cell-hp {
+      width: 18px;
+      height: 14px;
+      border-radius: 4px;
+      background: rgba(255, 70, 85, 0.16);
+      border: 1px solid rgba(255, 70, 85, 0.45);
+      transition: all 0.25s ease;
+    }
+    .cell-hp.active {
+      background: linear-gradient(135deg, #ff5e6c, #d91e36);
+      border-color: #ff9aa2;
+      box-shadow: 0 0 8px rgba(255, 65, 85, 0.65);
+    }
+
+    .cell-mana {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+      background: rgba(41, 152, 255, 0.16);
+      border: 1px solid rgba(41, 152, 255, 0.45);
+      transition: all 0.25s ease;
+    }
+    .cell-mana.active {
+      background: linear-gradient(135deg, #4db5ff, #1565c0);
+      border-color: #90d5ff;
+      box-shadow: 0 0 8px rgba(41, 152, 255, 0.65);
+    }
+
+    .cell-stam {
+      width: 28px;
+      height: 12px;
+      border-radius: 4px;
+      background: rgba(74, 222, 128, 0.15);
+      border: 1px solid rgba(74, 222, 128, 0.4);
+      position: relative;
+      overflow: hidden;
+    }
+    .cell-stam-fill {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #34d399, #fbbf24);
+      box-shadow: 0 0 8px rgba(52, 211, 153, 0.6);
+      transition: width 0.08s linear;
+    }
+
+    /* TOP CENTER: Current Spell Combination */
+    .combo-panel {
+      position: absolute;
+      top: max(12px, env(safe-area-inset-top));
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--panel-bg);
+      border: 1.5px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 8px 18px 10px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 220px;
+    }
+
+    .combo-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--gold);
+      margin-bottom: 6px;
+    }
+
+    .combo-slots {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .sigil-slot {
+      width: 40px;
+      height: 40px;
+      border-radius: 11px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1.5px dashed rgba(255, 255, 255, 0.22);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.2s, background 0.2s;
+    }
+
+    .sigil-slot.filled-fire {
+      border-style: solid;
+      border-color: var(--fire-primary);
+      background: radial-gradient(circle, rgba(255, 77, 46, 0.32), rgba(120, 20, 10, 0.45));
+      box-shadow: 0 0 12px var(--fire-glow);
+      transform: scale(1.05);
+    }
+
+    .sigil-slot.filled-earth {
+      border-style: solid;
+      border-color: var(--earth-primary);
+      background: radial-gradient(circle, rgba(41, 152, 255, 0.32), rgba(10, 55, 120, 0.45));
+      box-shadow: 0 0 12px var(--earth-glow);
+      transform: scale(1.05);
+    }
+
+    .spell-status-line {
+      margin-top: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+      min-height: 16px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .cast-progress-wrap {
+      width: 100%;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 99px;
+      margin-top: 5px;
+      overflow: hidden;
+    /* TOP RIGHT: Spellbook & Audio Controls */
+    .top-right-controls {
+      pointer-events: auto;
+      position: absolute;
+      top: max(12px, env(safe-area-inset-top));
+      right: max(14px, env(safe-area-inset-right));
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .audio-btn {
+      background: var(--panel-bg);
+      border: 1.5px solid var(--panel-border);
+      border-radius: 14px;
+      width: 44px;
+      height: 44px;
+      color: var(--gold);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+      transition: transform 0.15s ease, border-color 0.2s, opacity 0.2s;
+    }
+    .audio-btn:active {
+      transform: scale(0.93);
+    }
+    .audio-btn.muted {
+      color: var(--text-muted);
+      border-color: rgba(255, 255, 255, 0.16);
+    }
+
+    .spellbook-btn {
+      background: var(--panel-bg);
+      border: 1.5px solid var(--panel-border);
+      border-radius: 14px;
+      padding: 10px 15px;
+      height: 44px;
+      color: var(--text-main);
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+      transition: transform 0.15s ease, border-color 0.2s;
+    }
+    .spellbook-btn:active {
+      transform: scale(0.95);
+    }
+
+    /* BOTTOM LEFT: Move Joystick */
+    .stick-zone-left {
+      pointer-events: auto;
+      position: absolute;
+      bottom: max(18px, env(safe-area-inset-bottom));
+      left: max(22px, env(safe-area-inset-left));
+      width: 134px;
+      height: 134px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,255,255,0.04) 0%, rgba(16,21,32,0.68) 100%);
+      border: 2px solid rgba(255, 255, 255, 0.22);
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.55), 0 6px 20px rgba(0,0,0,0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .stick-knob {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.35), rgba(140, 155, 180, 0.18));
+      border: 1.5px solid rgba(255, 255, 255, 0.45);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      position: absolute;
+      pointer-events: none;
+    }
+
+    .stick-hint {
+      position: absolute;
+      bottom: -18px;
+      font-size: 10px;
+      color: rgba(255,255,255,0.45);
+      letter-spacing: 0.04em;
+      pointer-events: none;
+    }
+
+    /* BOTTOM RIGHT CLUSTER: Exact Wireframe Layout */
+    .controls-right-cluster {
+      position: absolute;
+      bottom: max(18px, env(safe-area-inset-bottom));
+      right: max(22px, env(safe-area-inset-right));
+      width: 256px;
+      height: 224px;
+      pointer-events: none;
+    }
+
+    /* Aim Stick (Bottom Right Corner) */
+    .stick-zone-right {
+      pointer-events: auto;
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      width: 134px;
+      height: 134px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(243, 198, 95, 0.07) 0%, rgba(16, 21, 32, 0.72) 100%);
+      border: 2px solid rgba(243, 198, 95, 0.35);
+      box-shadow: inset 0 0 22px rgba(0,0,0,0.55), 0 6px 20px rgba(0,0,0,0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .stick-zone-right.ready-to-fire {
+      border-color: #fde047;
+      box-shadow: 0 0 24px rgba(253, 224, 71, 0.45), inset 0 0 18px rgba(253, 224, 71, 0.25);
+      animation: pulseAim 1.2s infinite alternate;
+    }
+
+    @keyframes pulseAim {
+      from { transform: scale(1); }
+      to { transform: scale(1.03); }
+    }
+
+    /* Fire Sigil Button (Left of Right Stick, Bottom) */
+    .btn-fire {
+      pointer-events: auto;
+      position: absolute;
+      right: 150px;
+      bottom: 4px;
+      width: 82px;
+      height: 82px;
+      border-radius: 20px;
+      background: linear-gradient(145deg, rgba(220, 48, 25, 0.85), rgba(115, 18, 12, 0.92));
+      border: 2px solid #ff7b63;
+      box-shadow: 0 8px 22px rgba(255, 65, 35, 0.4), inset 0 2px 6px rgba(255, 200, 180, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.1s ease, filter 0.15s;
+    }
+    .btn-fire:active, .btn-fire.pressed {
+      transform: scale(0.91);
+      filter: brightness(1.2);
+    }
+
+    /* Earth Sigil Button (Above Right Stick, Right Side) */
+    .btn-earth {
+      pointer-events: auto;
+      position: absolute;
+      right: 14px;
+      bottom: 146px;
+      width: 82px;
+      height: 82px;
+      border-radius: 20px;
+      background: linear-gradient(145deg, rgba(28, 122, 225, 0.85), rgba(12, 52, 118, 0.92));
+      border: 2px solid #7cc4ff;
+      box-shadow: 0 8px 22px rgba(41, 152, 255, 0.4), inset 0 2px 6px rgba(190, 230, 255, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.1s ease, filter 0.15s;
+    }
+    .btn-earth:active, .btn-earth.pressed {
+      transform: scale(0.91);
+      filter: brightness(1.2);
+    }
+
+    /* Dash / Jump Button (Above & Left of Right Stick, between Fire and Earth) */
+    .btn-dash {
+      pointer-events: auto;
+      position: absolute;
+      right: 112px;
+      bottom: 102px;
+      width: 66px;
+      height: 66px;
+      border-radius: 17px;
+      background: linear-gradient(145deg, rgba(38, 52, 74, 0.9), rgba(20, 28, 42, 0.95));
+      border: 2px solid #6ee7b7;
+      box-shadow: 0 6px 18px rgba(52, 211, 153, 0.3), inset 0 2px 5px rgba(255, 255, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.1s ease, opacity 0.2s;
+    }
+    .btn-dash:active, .btn-dash.pressed {
+      transform: scale(0.9);
+    }
+    .btn-dash.no-stamina {
+      opacity: 0.45;
+      border-color: #64748b;
+    }
+
+    /* MODALS (Spellbook, Victory, Defeat, Orientation) */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(7, 10, 16, 0.84);
+      backdrop-filter: blur(10px);
+      z-index: 50;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal-card {
+      background: linear-gradient(160deg, #161d2e 0%, #0f1420 100%);
+      border: 1.5px solid var(--panel-border);
+      border-radius: 20px;
+      width: 100%;
+      max-width: 780px;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75);
+      overflow: hidden;
+    }
+
+    .modal-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-header h2 {
+      margin: 0;
+      font-family: 'Cinzel', serif;
+      font-size: 20px;
+      color: var(--gold);
+      letter-spacing: 0.04em;
+    }
+
+    .close-modal-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      border-radius: 10px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .spell-grid {
+      padding: 14px 18px;
+      overflow-y: auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+      gap: 10px;
+      touch-action: pan-y;
+    }
+
+    .spell-card {
+      background: rgba(255, 255, 255, 0.035);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .spell-card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .spell-sigils-row {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .mini-sigil {
+      width: 26px;
+      height: 26px;
+      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .mini-sigil.fire {
+      background: rgba(255, 77, 46, 0.25);
+      border: 1px solid var(--fire-primary);
+    }
+    .mini-sigil.earth {
+      background: rgba(41, 152, 255, 0.25);
+      border: 1px solid var(--earth-primary);
+    }
+
+    .spell-name {
+      font-family: 'Cinzel', serif;
+      font-weight: 700;
+      font-size: 15px;
+      color: #fff;
+    }
+
+    .spell-meta {
+      display: flex;
+      gap: 8px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge-mana {
+      color: #7cc4ff;
+      background: rgba(41, 152, 255, 0.15);
+      padding: 2px 7px;
+      border-radius: 6px;
+    }
+    .badge-cast {
+      color: #fde047;
+      background: rgba(250, 204, 21, 0.15);
+      padding: 2px 7px;
+      border-radius: 6px;
+    }
+
+    .spell-desc {
+      font-size: 12px;
+      color: #cbd5e1;
+      line-height: 1.35;
+    }
+
+    /* End Game Modal */
+    .end-card {
+      max-width: 420px;
+      text-align: center;
+      padding: 28px 24px;
+      align-items: center;
+      gap: 14px;
+    }
+    .end-title {
+      font-family: 'Cinzel', serif;
+      font-size: 30px;
+      font-weight: 900;
+      margin: 0;
+    }
+    .end-subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin: 0;
+    }
+    .restart-btn {
+      margin-top: 8px;
+      background: linear-gradient(135deg, #f3c65f, #d97706);
+      color: #111827;
+      border: none;
+      border-radius: 14px;
+      padding: 12px 28px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(243, 198, 95, 0.35);
+    }
+    .restart-btn:active {
+      transform: scale(0.96);
+    }
+
+    /* Portrait Orientation Warning */
+    #portraitWarning {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #0b0e14;
+      z-index: 100;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 24px;
+      gap: 16px;
+    }
+    @media screen and (orientation: portrait) and (max-width: 768px) {
+      #portraitWarning {
+        display: flex;
+      }
+    }
+
+    /* Responsive adjustments for smaller mobile landscape screens */
+    @media (max-height: 440px) {
+      .stats-panel { padding: 7px 10px; gap: 5px; min-width: 148px; }
+      .combo-panel { padding: 5px 14px 7px; min-width: 190px; }
+      .sigil-slot { width: 32px; height: 32px; }
+      .stick-zone-left, .stick-zone-right { width: 112px; height: 112px; }
+      .stick-knob { width: 44px; height: 44px; }
+      .controls-right-cluster { width: 224px; height: 194px; }
+      .btn-fire { width: 70px; height: 70px; right: 126px; }
+      .btn-earth { width: 70px; height: 70px; right: 10px; bottom: 122px; }
+      .btn-dash { width: 56px; height: 56px; right: 94px; bottom: 86px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Portrait Orientation Prompt -->
+  <div id="portraitWarning">
+    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#f3c65f" stroke-width="1.8">
+      <rect x="5" y="2" width="14" height="20" rx="2" transform="rotate(90 12 12)"/>
+      <path d="M12 18h.01" />
+    </svg>
+    <h2 style="font-family:'Cinzel',serif; color:#f3c65f; margin:0;">Поверните устройство горизонтально</h2>
+    <p style="color:#9aa5b8; font-size:14px; max-width:300px; margin:0;">
+      «Sıqyrshy» разработана для альбомной ориентации экрана, чтобы удобно управлять двумя стиками и сигилами.
+    </p>
+  </div>
+
+  <!-- Game Arena Canvas -->
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- HUD Interface matching the exact wireframe -->
+  <div id="hud">
+    <!-- Top Left: Health, Mana, Stamina -->
+    <div class="stats-panel">
+      <div class="stat-row">
+        <span class="stat-label">Здоровье</span>
+        <div class="stat-cells" id="hpCells">
+          <div class="cell-hp active"></div>
+          <div class="cell-hp active"></div>
+          <div class="cell-hp active"></div>
+        </div>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Мана</span>
+        <div class="stat-cells" id="manaCells">
+          <div class="cell-mana active"></div>
+          <div class="cell-mana active"></div>
+          <div class="cell-mana active"></div>
+          <div class="cell-mana active"></div>
+        </div>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Выносливость</span>
+        <div class="stat-cells" id="stamCells">
+          <div class="cell-stam"><div class="cell-stam-fill" id="stamFill0"></div></div>
+          <div class="cell-stam"><div class="cell-stam-fill" id="stamFill1"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top Center: Current Spell Combination -->
+    <div class="combo-panel">
+      <button class="clear-combo-btn" id="btnClearCombo" title="Сбросить сигилы">✕</button>
+      <div class="combo-title">Текущая комбинация заклинания</div>
+      <div class="combo-slots" id="comboSlots">
+        <div class="sigil-slot" id="slot0"></div>
+        <div class="sigil-slot" id="slot1"></div>
+        <div class="sigil-slot" id="slot2"></div>
+      </div>
+      <div class="spell-status-line" id="spellStatusText">Соберите 3 сигила</div>
+      <div class="cast-progress-wrap" id="castProgressWrap">
+        <div class="cast-progress-bar" id="castProgressBar"></div>
+      </div>
+    </div>
+
+    <!-- Top Right: Audio Toggle & Spellbook Button -->
+    <div class="top-right-controls">
+      <button class="audio-btn" id="btnToggleAudio" title="Включить / Выключить звук" aria-label="Звук">
+        <svg id="iconSoundOn" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+        </svg>
+        <svg id="iconSoundOff" style="display:none;" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <line x1="23" y1="9" x2="17" y2="15"/>
+          <line x1="17" y1="9" x2="23" y2="15"/>
+        </svg>
+      </button>
+
+      <button class="spellbook-btn" id="btnOpenSpellbook">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f3c65f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        </svg>
+        <span>Список заклинаний</span>
+      </button>
+    </div>
+
+    <!-- Bottom Left: Movement Stick -->
+    <div class="stick-zone-left" id="leftStickZone">
+      <div class="stick-knob" id="leftStickKnob"></div>
+      <span class="stick-hint">A / D или Стик</span>
+    </div>
+
+    <!-- Bottom Right Cluster: Fire Sigil, Dash/Jump, Earth Sigil, Aim Stick -->
+    <div class="controls-right-cluster">
+      <!-- Earth Sigil Button (Top Right above Aim Stick) -->
+      <button class="btn-earth" id="btnEarthSigil" aria-label="Сигил Земли">
+        <svg width="44" height="44" viewBox="0 0 64 64" fill="none">
+          <defs>
+            <linearGradient id="earthGradBtn" x1="12" y1="8" x2="52" y2="56" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#bae6fd"/>
+              <stop offset="45%" stop-color="#38bdf8"/>
+              <stop offset="100%" stop-color="#0284c7"/>
+            </linearGradient>
+          </defs>
+          <polygon points="32,6 52,22 46,54 18,54 12,22" fill="url(#earthGradBtn)" stroke="#e0f2fe" stroke-width="2.5" stroke-linejoin="round"/>
+          <polygon points="32,6 42,26 32,46 22,26" fill="rgba(255,255,255,0.32)"/>
+          <path d="M12 22 L32 30 L52 22 M32 30 L32 54" stroke="#e0f2fe" stroke-width="2" stroke-opacity="0.75"/>
+        </svg>
+      </button>
+
+      <!-- Dash / Jump Button (Middle Left of Cluster) -->
+      <button class="btn-dash" id="btnDashAction" aria-label="Рывок или Прыжок">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6ee7b7" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+        </svg>
+      </button>
+
+      <!-- Fire Sigil Button (Bottom Left of Aim Stick) -->
+      <button class="btn-fire" id="btnFireSigil" aria-label="Сигил Огня">
+        <svg width="44" height="44" viewBox="0 0 64 64" fill="none">
+          <defs>
+            <linearGradient id="fireGradBtn" x1="16" y1="6" x2="48" y2="58" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#fef08a"/>
+              <stop offset="40%" stop-color="#fb923c"/>
+              <stop offset="100%" stop-color="#dc2626"/>
+            </linearGradient>
+          </defs>
+          <path d="M33 6C33 6 49 19 49 35C49 46.5 41.5 56 32 56C22.5 56 15 46.5 15 35C15 27.5 20 20.5 23 17C22.5 23 26 26 26 26C25 18 33 6 33 6Z" fill="url(#fireGradBtn)" stroke="#fed7aa" stroke-width="2.5" stroke-linejoin="round"/>
+          <path d="M32 30C32 30 39 36 39 43C39 48 35.8 52 32 52C28.2 52 25 48 25 43C25 38 32 30 32 30Z" fill="#fef9c3" fill-opacity="0.8"/>
+        </svg>
+      </button>
+
+      <!-- Aim / Cast Direction Stick (Bottom Right Corner) -->
+      <div class="stick-zone-right" id="rightStickZone">
+        <div class="stick-knob" id="rightStickKnob"></div>
+        <span class="stick-hint">Прицел и выпуск</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Spellbook Modal (Pause Screen) -->
+  <div class="modal-overlay" id="spellbookModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>Книга Заклинаний Sıqyrshy</h2>
+        <button class="close-modal-btn" id="btnCloseSpellbook">Продолжить бой</button>
+      </div>
+      <div style="padding: 8px 18px 0; font-size: 12px; color: #9aa5b8; display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+        <span style="display:inline-flex; align-items:center; gap:5px;">
+          <span class="mini-sigil fire" style="width:20px;height:20px;" id="legendFireIcon"></span> Сигил Силы (Огонь)
+        </span>
+        <span style="display:inline-flex; align-items:center; gap:5px;">
+          <span class="mini-sigil earth" style="width:20px;height:20px;" id="legendEarthIcon"></span> Сигил Защиты (Земля)
+        </span>
+        <span>• Наберите 3 сигила → дождитесь подготовки → оттяните и отпустите правый стик!</span>
+      </div>
+      <div class="spell-grid" id="spellGridContainer"></div>
+    </div>
+  </div>
+
+  <!-- Game Over / Victory Modal -->
+  <div class="modal-overlay" id="endGameModal">
+    <div class="modal-card end-card">
+      <h2 class="end-title" id="endGameTitle">Победа!</h2>
+      <p class="end-subtitle" id="endGameSubtitle">Вы одолели соперника в магической дуэли.</p>
+      <button class="restart-btn" id="btnRestartGame">Начать заново</button>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * SIQYRSHY — 2D Mobile Action Duel Prototype
+     * Strictly uses graphical Fire & Earth Sigils everywhere (zero Q/W letters).
+     * Includes full procedural Web Audio API Synthesizer (Ambient + SFX).
+     */
+
+    // =========================================================================
+    // 0. PROCEDURAL WEB AUDIO ENGINE (DARK FANTASY AMBIENT + SPELL SFX)
+    // =========================================================================
+    const SoundEngine = (() => {
+      let ctx = null;
+      let masterGain = null;
+      let ambientGain = null;
+      let sfxGain = null;
+      let noiseBuffer = null;
+      let isMuted = false;
+      let ambientStarted = false;
+      let ambientInterval = null;
+      let chimeInterval = null;
+      let chargeOsc = null;
+      let chargeGain = null;
+      let windCooldown = 0;
+
+      // D Dorian / Minor Pentatonic frequencies for mystical steppe fantasy feel
+      const CHORDS = [
+        [146.83, 220.00, 261.63, 329.63], // Dm9 (D3, A3, C4, E4)
+        [130.81, 196.00, 246.94, 293.66], // Cmaj7/9 (C3, G3, B3, D4)
+        [116.54, 174.61, 220.00, 261.63], // Bbmaj7 (Bb2, F3, A3, C4)
+        [110.00, 164.81, 196.00, 261.63]  // Am7 (A2, E3, G3, C4)
+      ];
+      const CHIME_NOTES = [587.33, 659.25, 783.99, 880.00, 1046.50, 1174.66];
+      let chordIdx = 0;
+
+      function createNoiseBuffer(audioCtx) {
+        const bufferSize = audioCtx.sampleRate * 2;
+        const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        let lastOut = 0;
+        for (let i = 0; i < bufferSize; i++) {
+          const white = Math.random() * 2 - 1;
+          // Pink/Brownian warmth
+          data[i] = (lastOut + (0.04 * white)) / 1.04;
+          lastOut = data[i];
+          data[i] *= 2.8;
+        }
+        return buffer;
+      }
+
+      function init() {
+        if (!ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (!AudioCtx) return false;
+          ctx = new AudioCtx();
+
+          masterGain = ctx.createGain();
+          masterGain.gain.value = isMuted ? 0 : 0.85;
+          masterGain.connect(ctx.destination);
+
+          ambientGain = ctx.createGain();
+          ambientGain.gain.value = 0.28;
+          ambientGain.connect(masterGain);
+
+          sfxGain = ctx.createGain();
+          sfxGain.gain.value = 0.72;
+          sfxGain.connect(masterGain);
+
+          noiseBuffer = createNoiseBuffer(ctx);
+        }
+
+        if (ctx.state === 'suspended') {
+          ctx.resume();
+        }
+
+        if (!ambientStarted && ctx.state === 'running') {
+          startAmbient();
+        }
+        return true;
+      }
+
+      function startAmbient() {
+        if (ambientStarted || !ctx) return;
+        ambientStarted = true;
+
+        // Subtle continuous steppe wind bed
+        const windSrc = ctx.createBufferSource();
+        windSrc.buffer = noiseBuffer;
+        windSrc.loop = true;
+
+        const windFilter = ctx.createBiquadFilter();
+        windFilter.type = 'bandpass';
+        windFilter.frequency.value = 320;
+        windFilter.Q.value = 2.4;
+
+        // Slow LFO modulating wind filter
+        const lfo = ctx.createOscillator();
+        const lfoGain = ctx.createGain();
+        lfo.frequency.value = 0.09;
+        lfoGain.gain.value = 140;
+        lfo.connect(lfoGain);
+        lfoGain.connect(windFilter.frequency);
+        lfo.start();
+
+        const windVol = ctx.createGain();
+        windVol.gain.value = 0.14;
+        windSrc.connect(windFilter);
+        windFilter.connect(windVol);
+        windVol.connect(ambientGain);
+        windSrc.start();
+
+        // Pad chord progression loop
+        const triggerPadChord = () => {
+          if (!ctx || isMuted) return;
+          const now = ctx.currentTime;
+          const chord = CHORDS[chordIdx % CHORDS.length];
+          chordIdx++;
+
+          chord.forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const subOsc = ctx.createOscillator();
+            const filter = ctx.createBiquadFilter();
+            const env = ctx.createGain();
+
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now);
+            subOsc.type = 'sine';
+            subOsc.frequency.setValueAtTime(freq * 0.5, now);
+
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(420 + i * 70, now);
+            filter.frequency.linearRampToValueAtTime(760 + i * 90, now + 4.5);
+            filter.frequency.linearRampToValueAtTime(380, now + 9.2);
+
+            env.gain.setValueAtTime(0.0001, now);
+            env.gain.linearRampToValueAtTime(0.095 / chord.length, now + 2.6);
+            env.gain.setValueAtTime(0.095 / chord.length, now + 6.2);
+            env.gain.exponentialRampToValueAtTime(0.0001, now + 9.4);
+
+            osc.connect(filter);
+            subOsc.connect(filter);
+            filter.connect(env);
+            env.connect(ambientGain);
+
+            osc.start(now);
+            subOsc.start(now);
+            osc.stop(now + 9.5);
+            subOsc.stop(now + 9.5);
+          });
+        };
+
+        triggerPadChord();
+        ambientInterval = setInterval(triggerPadChord, 8200);
+
+        // Occasional mystical steppe chimes
+        chimeInterval = setInterval(() => {
+          if (!ctx || isMuted || Math.random() > 0.65) return;
+          const now = ctx.currentTime;
+          const freq = CHIME_NOTES[Math.floor(Math.random() * CHIME_NOTES.length)];
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now);
+          gain.gain.setValueAtTime(0.0001, now);
+          gain.gain.linearRampToValueAtTime(0.045, now + 0.04);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.4);
+          osc.connect(gain);
+          gain.connect(ambientGain);
+          osc.start(now);
+          osc.stop(now + 2.5);
+        }, 3600);
+      }
+
+      function toggleMute() {
+        init();
+        isMuted = !isMuted;
+        if (masterGain && ctx) {
+          masterGain.gain.setTargetAtTime(isMuted ? 0 : 0.85, ctx.currentTime, 0.04);
+        }
+        return isMuted;
+      }
+
+      function playNoiseBurst(duration, filterType, startFreq, endFreq, vol, q = 1.2) {
+        if (!init() || isMuted) return;
+        const now = ctx.currentTime;
+        const src = ctx.createBufferSource();
+        src.buffer = noiseBuffer;
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = filterType;
+        filter.frequency.setValueAtTime(startFreq, now);
+        if (endFreq !== startFreq) {
+          filter.frequency.exponentialRampToValueAtTime(Math.max(20, endFreq), now + duration);
+        }
+        filter.Q.value = q;
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(vol, now + Math.min(0.02, duration * 0.2));
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+        src.connect(filter);
+        filter.connect(gain);
+        gain.connect(sfxGain);
+
+        src.start(now);
+        src.stop(now + duration + 0.02);
+      }
+
+      function playTone(type, startFreq, endFreq, duration, vol, delay = 0) {
+        if (!init() || isMuted) return;
+        const now = ctx.currentTime + delay;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(startFreq, now);
+        if (endFreq !== startFreq) {
+          osc.frequency.exponentialRampToValueAtTime(Math.max(20, endFreq), now + duration);
+        }
+
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.linearRampToValueAtTime(vol, now + Math.min(0.015, duration * 0.25));
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+        osc.connect(gain);
+        gain.connect(sfxGain);
+        osc.start(now);
+        osc.stop(now + duration + 0.02);
+      }
+
+      function playSigil(type, slotIndex) {
+        const pitchMult = 1 + slotIndex * 0.22; // Escalating pitch for slot 1, 2, 3
+        if (type === 'F') {
+          // Warm flame whoosh + bright harmonic ember chime
+          playNoiseBurst(0.24, 'bandpass', 480 * pitchMult, 1450 * pitchMult, 0.35, 2.0);
+          playTone('triangle', 330 * pitchMult, 520 * pitchMult, 0.22, 0.24);
+          playTone('sine', 660 * pitchMult, 880 * pitchMult, 0.18, 0.14, 0.03);
+        } else {
+          // Deep stone thud + crystalline earth resonance
+          playTone('sine', 145 * pitchMult, 65, 0.25, 0.38);
+          playTone('triangle', 440 * pitchMult, 587 * pitchMult, 0.28, 0.22);
+          playTone('sine', 880 * pitchMult, 1174 * pitchMult, 0.22, 0.12, 0.02);
+        }
+      }
+
+      function playClearCombo() {
+        playTone('sine', 420, 170, 0.22, 0.2);
+        playNoiseBurst(0.18, 'lowpass', 600, 180, 0.16);
+      }
+
+      function playJump(isDouble) {
+        const base = isDouble ? 290 : 210;
+        playNoiseBurst(0.22, 'bandpass', base, base * 2.4, 0.28, 1.6);
+        playTone('sine', base, base * 1.65, 0.18, 0.18);
+      }
+
+      function playDash() {
+        playNoiseBurst(0.26, 'bandpass', 950, 260, 0.45, 1.8);
+        playTone('triangle', 380, 120, 0.2, 0.24);
+      }
+
+      function playWindUpdraft(dt) {
+        windCooldown -= dt;
+        if (windCooldown <= 0) {
+          windCooldown = 0.35;
+          playNoiseBurst(0.38, 'bandpass', 360, 680, 0.14, 3.0);
+        }
+      }
+
+      function startCastCharge(duration) {
+        stopCastCharge();
+        if (!init() || isMuted) return;
+        const now = ctx.currentTime;
+        chargeOsc = ctx.createOscillator();
+        chargeGain = ctx.createGain();
+        chargeOsc.type = 'sine';
+        chargeOsc.frequency.setValueAtTime(180, now);
+        chargeOsc.frequency.exponentialRampToValueAtTime(540, now + duration);
+
+        chargeGain.gain.setValueAtTime(0.001, now);
+        chargeGain.gain.linearRampToValueAtTime(0.11, now + duration * 0.85);
+
+        chargeOsc.connect(chargeGain);
+        chargeGain.connect(sfxGain);
+        chargeOsc.start(now);
+      }
+
+      function stopCastCharge() {
+        if (chargeOsc) {
+          try {
+            chargeOsc.stop();
+            chargeOsc.disconnect();
+          } catch (_) {}
+          chargeOsc = null;
+          chargeGain = null;
+        }
+      }
+
+      function playSpellCast(spellId) {
+        stopCastCharge();
+        switch (spellId) {
+          case 'shabyyl':
+            // Laser-like fiery energy beam
+            playTone('sawtooth', 880, 190, 0.34, 0.26);
+            playNoiseBurst(0.3, 'bandpass', 1800, 420, 0.36, 1.4);
+            break;
+          case 'juldyzdar':
+            // Star cloud summoning shimmer
+            [587.33, 783.99, 987.77, 1174.66].forEach((f, idx) => {
+              playTone('sine', f, f * 1.12, 0.45, 0.16, idx * 0.06);
+            });
+            playNoiseBurst(0.45, 'highpass', 1200, 2400, 0.18);
+            break;
+          case 'jebe':
+            // Bowstring twang + high-velocity piercing arrow whistle
+            playTone('triangle', 240, 110, 0.14, 0.32);
+            playNoiseBurst(0.32, 'bandpass', 2400, 950, 0.4, 3.2);
+            playTone('sine', 1320, 680, 0.26, 0.22);
+            break;
+          case 'otshashy':
+            // Pyrotechnic firework burst + crackles
+            playNoiseBurst(0.42, 'lowpass', 1600, 140, 0.55);
+            for (let i = 0; i < 5; i++) {
+              playNoiseBurst(0.1, 'bandpass', 2200 + i * 300, 900, 0.25, 2.5);
+            }
+            playTone('sawtooth', 260, 75, 0.28, 0.25);
+            break;
+          case 'qorgay':
+            // Deep resonant dome activation
+            playTone('sine', 130.81, 261.63, 0.45, 0.34);
+            playTone('triangle', 392.00, 523.25, 0.4, 0.2, 0.04);
+            break;
+          case 'densaylyq':
+            // Warm ascending healing arpeggio
+            [329.63, 440.00, 554.37, 659.25, 880.00].forEach((f, idx) => {
+              playTone('sine', f, f, 0.42, 0.2, idx * 0.07);
+            });
+            break;
+          case 'kush':
+            // Crystalline mana surge
+            [440.00, 587.33, 880.00, 1174.66].forEach((f, idx) => {
+              playTone('triangle', f, f * 1.05, 0.38, 0.2, idx * 0.055);
+            });
+            break;
+          case 'korinbey':
+            // Ghostly phase-out whisper
+            playNoiseBurst(0.55, 'bandpass', 1400, 320, 0.32, 3.5);
+            playTone('sine', 620, 240, 0.5, 0.18);
+            break;
+        }
+      }
+
+      function playStarDrop() {
+        playTone('sine', 1180, 520, 0.18, 0.11);
+      }
+
+      function playShieldBlock(pierced = false) {
+        if (pierced) {
+          // Glass/crystal shatter + pierce chime
+          playNoiseBurst(0.32, 'highpass', 1400, 400, 0.42);
+          playTone('sawtooth', 740, 210, 0.28, 0.28);
+        } else {
+          // Solid energy dome deflection
+          playTone('sine', 520, 780, 0.24, 0.32);
+          playTone('triangle', 260, 390, 0.22, 0.24);
+        }
+      }
+
+      function playWallBreak() {
+        playNoiseBurst(0.34, 'lowpass', 520, 90, 0.45);
+        playTone('square', 110, 48, 0.24, 0.22);
+      }
+
+      function playDamage() {
+        playNoiseBurst(0.28, 'lowpass', 900, 150, 0.5);
+        playTone('sawtooth', 190, 62, 0.3, 0.36);
+      }
+
+      function playVictory() {
+        stopCastCharge();
+        [293.66, 369.99, 440.00, 587.33, 739.99].forEach((f, i) => {
+          playTone('triangle', f, f, 0.85, 0.22, i * 0.11);
+        });
+      }
+
+      function playDefeat() {
+        stopCastCharge();
+        [293.66, 261.63, 220.00, 146.83].forEach((f, i) => {
+          playTone('sawtooth', f, f * 0.96, 0.9, 0.18, i * 0.16);
+        });
+      }
+
+      return {
+        init,
+        toggleMute,
+        playSigil,
+        playClearCombo,
+        playJump,
+        playDash,
+        playWindUpdraft,
+        startCastCharge,
+        stopCastCharge,
+        playSpellCast,
+        playStarDrop,
+        playShieldBlock,
+        playWallBreak,
+        playDamage,
+        playVictory,
+        playDefeat
+      };
+    })();
+
+    // Unlock Web Audio on first user interaction anywhere
+    ['pointerdown', 'keydown'].forEach(evt => {
+      window.addEventListener(evt, () => SoundEngine.init(), { passive: true });
+    });
+
+    // =========================================================================
+    // 1. SVG SIGIL ASSETS & SPELL DEFINITIONS (F = Fire, E = Earth)
+    // =========================================================================
+    const FIRE_SVG_SMALL = `
+      <svg width="20" height="20" viewBox="0 0 64 64" fill="none">
+        <path d="M33 6C33 6 49 19 49 35C49 46.5 41.5 56 32 56C22.5 56 15 46.5 15 35C15 27.5 20 20.5 23 17C22.5 23 26 26 26 26C25 18 33 6 33 6Z" fill="#ff5733" stroke="#ffd8be" stroke-width="3"/>
+        <path d="M32 31C32 31 38 36 38 43C38 47.5 35.3 51 32 51C28.7 51 26 47.5 26 43C26 38 32 31 32 31Z" fill="#fef08a"/>
+      </svg>`;
+
+    const EARTH_SVG_SMALL = `
+      <svg width="20" height="20" viewBox="0 0 64 64" fill="none">
+        <polygon points="32,6 52,22 46,54 18,54 12,22" fill="#2998ff" stroke="#d0ebff" stroke-width="3" stroke-linejoin="round"/>
+        <polygon points="32,6 42,26 32,46 22,26" fill="rgba(255,255,255,0.38)"/>
+      </svg>`;
+
+    // All 8 Spells from the CSV specification (order matters!)
+    const SPELLS = [
+      {
+        id: 'shabyyl',
+        combo: ['F', 'F', 'F'],
+        name: 'Shabýyl',
+        type: 'Атакующее',
+        castTime: 2.0,
+        manaCost: 1,
+        desc: 'Базовое атакующее: прямой быстрый луч с испаряющимся следом маны через всю арену (1 урон).'
+      },
+      {
+        id: 'juldyzdar',
+        combo: ['F', 'F', 'E'],
+        name: 'Juldyzdar',
+        type: 'Атакующее',
+        castTime: 3.0,
+        manaCost: 2,
+        desc: 'Град звёзд: создаёт над целью или в точке прицела облако на 5 сек, сбрасывающее звёзды (1 урон каждая).'
+      },
+      {
+        id: 'jebe',
+        combo: ['F', 'E', 'E'],
+        name: 'Jebe',
+        type: 'Пробивающее',
+        castTime: 3.0,
+        manaCost: 2,
+        desc: 'Стрела: призывает магический лук и выпускает стрелу, пробивающую барьер Qorǵaý и стены (1 урон).'
+      },
+      {
+        id: 'otshashy',
+        combo: ['F', 'E', 'F'],
+        name: 'Otshashý',
+        type: 'Ближний бой',
+        castTime: 1.0,
+        manaCost: 1,
+        desc: 'Фейерверк: мощный веерный залп крупными искрами перед собой на ближней дистанции (2 урона).'
+      },
+      {
+        id: 'qorgay',
+        combo: ['E', 'E', 'E'],
+        name: 'Qorǵaý',
+        type: 'Защитное',
+        castTime: 1.0,
+        manaCost: 1,
+        desc: 'Барьер: создаёт перед магом энергетическую полусферу, поглощающую 1 любой снаряд (кроме Jebe).'
+      },
+      {
+        id: 'densaylyq',
+        combo: ['E', 'E', 'F'],
+        name: 'Densaýlyq',
+        type: 'Восстановление',
+        castTime: 2.0,
+        manaCost: 2,
+        desc: 'Исцеление: полностью восстанавливает здоровье мага (до 3 ячеек).'
+      },
+      {
+        id: 'kush',
+        combo: ['E', 'F', 'F'],
+        name: 'Kúsh',
+        type: 'Восстановление',
+        castTime: 1.0,
+        manaCost: 1,
+        desc: 'Приток силы: полностью восполняет запас маны мага (до 4 ячеек).'
+      },
+      {
+        id: 'korinbey',
+        combo: ['E', 'F', 'E'],
+        name: 'Kórinbeý',
+        type: 'Скрытность',
+        castTime: 2.0,
+        manaCost: 3,
+        desc: 'Невидимость: скрывает мага от взора и прицела противника до применения следующего заклинания.'
+      }
+    ];
+
+    function findSpellByCombo(comboArr) {
+      if (comboArr.length !== 3) return null;
+      const key = comboArr.join('');
+      return SPELLS.find(s => s.combo.join('') === key) || null;
+    }
+
+    // Populate Spellbook UI
+    function buildSpellbookUI() {
+      document.getElementById('legendFireIcon').innerHTML = FIRE_SVG_SMALL;
+      document.getElementById('legendEarthIcon').innerHTML = EARTH_SVG_SMALL;
+      const grid = document.getElementById('spellGridContainer');
+      grid.innerHTML = '';
+
+      SPELLS.forEach(sp => {
+        const sigilsHtml = sp.combo.map(s => `
+          <div class="mini-sigil ${s === 'F' ? 'fire' : 'earth'}">
+            ${s === 'F' ? FIRE_SVG_SMALL : EARTH_SVG_SMALL}
+          </div>
+        `).join('');
+
+        const card = document.createElement('div');
+        card.className = 'spell-card';
+        card.innerHTML = `
+          <div class="spell-card-top">
+            <div class="spell-sigils-row">${sigilsHtml}</div>
+            <span class="spell-name">${sp.name}</span>
+          </div>
+          <div class="spell-meta">
+            <span class="badge-mana">Мана: ${sp.manaCost}</span>
+            <span class="badge-cast">Подготовка: ${sp.castTime.toFixed(1)} сек</span>
+          </div>
+          <div class="spell-desc">${sp.desc}</div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    // =========================================================================
+    // 2. CANVAS & LOGICAL ARENA COORDINATE SYSTEM (10m wide x 5.6m high)
+    // =========================================================================
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const WORLD_WIDTH = 10.0;   // 10 meters arena width as specified in GDD
+    const WORLD_HEIGHT = 5.6;   // 5.6 meters vertical space
+    const GROUND_Y = 4.85;      // Ground level in meters
+    const GRAVITY = 15.5;       // m/s^2
+
+    let viewTransform = { scale: 100, offsetX: 0, offsetY: 0 };
+
+    function resizeCanvas() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = window.innerWidth * dpr;
+      canvas.height = window.innerHeight * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const scaleX = window.innerWidth / WORLD_WIDTH;
+      const scaleY = window.innerHeight / WORLD_HEIGHT;
+      viewTransform.scale = Math.min(scaleX, scaleY);
+      viewTransform.offsetX = (window.innerWidth - WORLD_WIDTH * viewTransform.scale) * 0.5;
+      viewTransform.offsetY = (window.innerHeight - WORLD_HEIGHT * viewTransform.scale) * 0.5;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function toScreenX(wx) { return viewTransform.offsetX + wx * viewTransform.scale; }
+    function toScreenY(wy) { return viewTransform.offsetY + wy * viewTransform.scale; }
+    function toWorldX(sx) { return (sx - viewTransform.offsetX) / viewTransform.scale; }
+    function toWorldY(sy) { return (sy - viewTransform.offsetY) / viewTransform.scale; }
+
+    // =========================================================================
+    // 3. GAME STATE & ENTITIES
+    // =========================================================================
+    let isPaused = false;
+    let isGameOver = false;
+    let lastTimestamp = 0;
+
+    // Entities arrays
+    let platforms = [];
+    let destructibleWalls = [];
+    let windStreams = [];
+    let projectiles = [];
+    let starClouds = [];
+    let particles = [];
+    let floatingTexts = [];
+    let beams = [];
+
+    function createWizard(id, x, facing, palette) {
+      return {
+        id,
+        x,
+        y: GROUND_Y,
+        vx: 0,
+        vy: 0,
+        radius: 0.24,
+        height: 0.78,
+        facing, // 1 = right, -1 = left
+        onGround: true,
+        jumpsUsed: 0,
+        dashTimer: 0,
+        dashVx: 0,
+        dashVy: 0,
+        hp: 3,
+        maxHp: 3,
+        mana: 4,
+        maxMana: 4,
+        stamina: 2.0,
+        maxStamina: 2.0,
+        // Spellcasting state
+        sigils: [],           // array of 'F' or 'E' (max 3)
+        activeSpell: null,    // spell object once 3 sigils entered
+        castElapsed: 0,
+        castReady: false,
+        // Defensive / Stealth states
+        shieldHp: 0,
+        shieldAngle: 0,
+        shieldTimer: 0,
+        invisibleTimer: 0,
+        hitFlash: 0,
+        animPhase: Math.random() * 6,
+        palette
+      };
+    }
+
+    let player = null;
+    let bot = null;
+
+    // Bot AI memory
+    let botAI = {
+      thinkTimer: 0,
+      desiredMoveX: 0,
+      aimAngle: Math.PI,
+      sigilCooldown: 0,
+      plannedCombo: null,
+      releaseDelay: 0
+    };
+
+    function initMatch() {
+      isPaused = false;
+      isGameOver = false;
+      document.getElementById('spellbookModal').classList.remove('open');
+      document.getElementById('endGameModal').classList.remove('open');
+
+      player = createWizard('player', 1.6, 1, {
+        robe: '#1d4ed8',
+        trim: '#f3c65f',
+        aura: 'rgba(56, 189, 248, 0.35)'
+      });
+
+      bot = createWizard('bot', 8.4, -1, {
+        robe: '#991b1b',
+        trim: '#fca5a5',
+        aura: 'rgba(248, 113, 113, 0.35)'
+      });
+
+      // Platforms (steppe stone ruins)
+      platforms = [
+        { x: 1.9, y: 3.65, w: 1.45, h: 0.16, hp: 3, maxHp: 3 },
+        { x: 6.65, y: 3.65, w: 1.45, h: 0.16, hp: 3, maxHp: 3 },
+        { x: 4.15, y: 2.85, w: 1.7, h: 0.16, hp: 4, maxHp: 4 }
+      ];
+
+      // Destructible stone pillars/walls
+      destructibleWalls = [
+        { x: 3.55, y: GROUND_Y - 1.05, w: 0.28, h: 1.05, hp: 2, maxHp: 2 },
+        { x: 6.17, y: GROUND_Y - 1.05, w: 0.28, h: 1.05, hp: 2, maxHp: 2 }
+      ];
+
+      // Updraft Wind Streams
+      windStreams = [
+        { x: 1.15, width: 0.65, topY: 1.6, bottomY: GROUND_Y, phase: 0 },
+        { x: 8.85, width: 0.65, topY: 1.6, bottomY: GROUND_Y, phase: 2.1 }
+      ];
+
+      projectiles = [];
+      starClouds = [];
+      particles = [];
+      floatingTexts = [];
+      beams = [];
+
+      botAI = {
+        thinkTimer: 0.4,
+        desiredMoveX: 0,
+        aimAngle: Math.PI,
+        sigilCooldown: 0.7,
+        plannedCombo: ['F', 'F', 'F'],
+        releaseDelay: 0
+      };
+
+      updateHUD();
+    }
+
+    // =========================================================================
+    // 4. INPUT HANDLING (MULTI-TOUCH POINTERS + KEYBOARD/MOUSE SUPPORT)
+    // =========================================================================
+    const inputState = {
+      moveX: 0,           // -1 to 1 from left stick or A/D
+      leftStickActive: false,
+      leftStickRawY: 0,   // used for dash direction (up/down)
+      aimActive: false,
+      aimAngle: 0,
+      aimMagnitude: 0
+    };
+
+    const keysDown = new Set();
+
+    // Left Stick Touch/Mouse
+    const leftZone = document.getElementById('leftStickZone');
+    const leftKnob = document.getElementById('leftStickKnob');
+    let leftPointerId = null;
+
+    function updateLeftStick(clientX, clientY) {
+      const rect = leftZone.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const maxR = rect.width * 0.36;
+
+      let dx = clientX - cx;
+      let dy = clientY - cy;
+      const dist = Math.hypot(dx, dy);
+      if (dist > maxR) {
+        dx = (dx / dist) * maxR;
+        dy = (dy / dist) * maxR;
+      }
+
+      leftKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+      const normX = dx / maxR;
+      const normY = dy / maxR;
+
+      // Left stick only moves left/right (vertical doesn't move character directly, only informs dash)
+      inputState.moveX = Math.abs(normX) > 0.15 ? normX : 0;
+      inputState.leftStickRawY = normY;
+    }
+
+    function resetLeftStick() {
+      leftPointerId = null;
+      inputState.leftStickActive = false;
+      inputState.moveX = 0;
+      inputState.leftStickRawY = 0;
+      leftKnob.style.transform = 'translate(0px, 0px)';
+    }
+
+    leftZone.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (leftPointerId !== null) return;
+      leftPointerId = e.pointerId;
+      leftZone.setPointerCapture(e.pointerId);
+      inputState.leftStickActive = true;
+      updateLeftStick(e.clientX, e.clientY);
+    });
+
+    leftZone.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== leftPointerId) return;
+      updateLeftStick(e.clientX, e.clientY);
+    });
+
+    leftZone.addEventListener('pointerup', (e) => {
+      if (e.pointerId === leftPointerId) resetLeftStick();
+    });
+    leftZone.addEventListener('pointercancel', (e) => {
+      if (e.pointerId === leftPointerId) resetLeftStick();
+    });
+
+    // Right Stick (Aim & Release to Cast)
+    const rightZone = document.getElementById('rightStickZone');
+    const rightKnob = document.getElementById('rightStickKnob');
+    let rightPointerId = null;
+
+    function updateRightStick(clientX, clientY) {
+      const rect = rightZone.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const maxR = rect.width * 0.38;
+
+      let dx = clientX - cx;
+      let dy = clientY - cy;
+      const dist = Math.hypot(dx, dy);
+      if (dist > maxR) {
+        dx = (dx / dist) * maxR;
+        dy = (dy / dist) * maxR;
+      }
+
+      rightKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+      inputState.aimMagnitude = Math.min(dist / maxR, 1);
+      if (dist > 8) {
+        inputState.aimAngle = Math.atan2(dy, dx);
+        player.facing = Math.cos(inputState.aimAngle) >= 0 ? 1 : -1;
+      }
+    }
+
+    function releaseRightStick() {
+      const wasAiming = inputState.aimActive;
+      rightPointerId = null;
+      inputState.aimActive = false;
+      rightKnob.style.transform = 'translate(0px, 0px)';
+
+      // Trigger spell if cast is ready upon releasing the directional stick!
+      if (wasAiming && player && player.castReady && !isPaused && !isGameOver) {
+        executeWizardSpell(player, inputState.aimAngle);
+      }
+      inputState.aimMagnitude = 0;
+    }
+
+    rightZone.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (rightPointerId !== null) return;
+      rightPointerId = e.pointerId;
+      rightZone.setPointerCapture(e.pointerId);
+      inputState.aimActive = true;
+      inputState.aimAngle = player.facing === 1 ? 0 : Math.PI;
+      updateRightStick(e.clientX, e.clientY);
+    });
+
+    rightZone.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== rightPointerId) return;
+      updateRightStick(e.clientX, e.clientY);
+    });
+
+    rightZone.addEventListener('pointerup', (e) => {
+      if (e.pointerId === rightPointerId) releaseRightStick();
+    });
+    rightZone.addEventListener('pointercancel', (e) => {
+      if (e.pointerId === rightPointerId) releaseRightStick();
+    });
+
+    // Sigil Buttons & Dash Button
+    document.getElementById('btnFireSigil').addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (!isPaused && !isGameOver) addSigilToWizard(player, 'F');
+    });
+
+    document.getElementById('btnEarthSigil').addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (!isPaused && !isGameOver) addSigilToWizard(player, 'E');
+    });
+
+    document.getElementById('btnDashAction').addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (!isPaused && !isGameOver) performDashOrJump(player, inputState);
+    });
+
+    document.getElementById('btnClearCombo').addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (!isPaused && !isGameOver && player) {
+        if (player.sigils.length > 0) SoundEngine.playClearCombo();
+        clearWizardSigils(player);
+        updateHUD();
+      }
+    });
+
+    // Audio Mute / Unmute Button
+    document.getElementById('btnToggleAudio').addEventListener('click', () => {
+      const muted = SoundEngine.toggleMute();
+      const btn = document.getElementById('btnToggleAudio');
+      btn.classList.toggle('muted', muted);
+      document.getElementById('iconSoundOn').style.display = muted ? 'none' : 'block';
+      document.getElementById('iconSoundOff').style.display = muted ? 'block' : 'none';
+    });
+
+    // Spellbook & Restart Modals
+    document.getElementById('btnOpenSpellbook').addEventListener('click', () => {
+      if (isGameOver) return;
+      isPaused = true;
+      document.getElementById('spellbookModal').classList.add('open');
+    });
+
+    document.getElementById('btnCloseSpellbook').addEventListener('click', () => {
+      document.getElementById('spellbookModal').classList.remove('open');
+      isPaused = false;
+      lastTimestamp = performance.now();
+    });
+
+    document.getElementById('btnRestartGame').addEventListener('click', () => {
+      initMatch();
+      lastTimestamp = performance.now();
+    });
+
+    // Desktop Keyboard & Canvas Mouse convenience (without ever showing Q/W in UI!)
+    window.addEventListener('keydown', (e) => {
+      if (isGameOver) return;
+      if (e.code === 'Escape') {
+        const modal = document.getElementById('spellbookModal');
+        if (modal.classList.contains('open')) {
+          modal.classList.remove('open');
+          isPaused = false;
+          lastTimestamp = performance.now();
+        } else {
+          isPaused = true;
+          modal.classList.add('open');
+        }
+        return;
+      }
+      if (isPaused) return;
+
+      keysDown.add(e.code);
+      if (e.code === 'Digit1' || e.code === 'KeyJ') addSigilToWizard(player, 'F');
+      if (e.code === 'Digit2' || e.code === 'KeyK') addSigilToWizard(player, 'E');
+      if (e.code === 'Space' || e.code === 'ShiftLeft') {
+        e.preventDefault();
+        performDashOrJump(player, getEffectiveInput());
+      }
+      if (e.code === 'KeyR') {
+        if (player.sigils.length > 0) SoundEngine.playClearCombo();
+        clearWizardSigils(player);
+        updateHUD();
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      keysDown.delete(e.code);
+    });
+
+    // Allow aiming & releasing directly on canvas with mouse for easy desktop playtesting
+    let canvasMouseAiming = false;
+    canvas.addEventListener('pointerdown', (e) => {
+      if (isPaused || isGameOver || e.pointerType === 'touch') return;
+      canvasMouseAiming = true;
+      inputState.aimActive = true;
+      const wx = toWorldX(e.clientX);
+      const wy = toWorldY(e.clientY);
+      inputState.aimAngle = Math.atan2(wy - (player.y - 0.4), wx - player.x);
+      inputState.aimMagnitude = 1;
+      player.facing = Math.cos(inputState.aimAngle) >= 0 ? 1 : -1;
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if (!canvasMouseAiming || isPaused || isGameOver) return;
+      const wx = toWorldX(e.clientX);
+      const wy = toWorldY(e.clientY);
+      inputState.aimAngle = Math.atan2(wy - (player.y - 0.4), wx - player.x);
+      player.facing = Math.cos(inputState.aimAngle) >= 0 ? 1 : -1;
+    });
+
+    canvas.addEventListener('pointerup', (e) => {
+      if (!canvasMouseAiming) return;
+      canvasMouseAiming = false;
+      inputState.aimActive = false;
+      inputState.aimMagnitude = 0;
+      if (player && player.castReady && !isPaused && !isGameOver) {
+        executeWizardSpell(player, inputState.aimAngle);
+      }
+    });
+
+    function getEffectiveInput() {
+      let mx = inputState.moveX;
+      let rawY = inputState.leftStickRawY;
+      let active = inputState.leftStickActive;
+
+      if (keysDown.has('KeyA') || keysDown.has('ArrowLeft')) { mx = -1; active = true; }
+      if (keysDown.has('KeyD') || keysDown.has('ArrowRight')) { mx = 1; active = true; }
+      if (keysDown.has('KeyW') || keysDown.has('ArrowUp')) { rawY = -1; active = true; }
+      if (keysDown.has('KeyS') || keysDown.has('ArrowDown')) { rawY = 1; active = true; }
+
+      return { moveX: mx, leftStickRawY: rawY, leftStickActive: active };
+    }
+
+    // =========================================================================
+    // 5. SPELLCASTING & MOVEMENT MECHANICS
+    // =========================================================================
+    function clearWizardSigils(wiz) {
+      if (wiz.id === 'player') SoundEngine.stopCastCharge();
+      wiz.sigils = [];
+      wiz.activeSpell = null;
+      wiz.castElapsed = 0;
+      wiz.castReady = false;
+    }
+
+    function addSigilToWizard(wiz, sigilType) {
+      // Cannot add new sigils once 3 are stacked until cast finishes and spell is released
+      if (wiz.sigils.length >= 3) return;
+
+      const slotIndex = wiz.sigils.length;
+      wiz.sigils.push(sigilType);
+      if (wiz.id === 'player') {
+        SoundEngine.playSigil(sigilType, slotIndex);
+      }
+      spawnBurstParticles(wiz.x, wiz.y - 0.85, sigilType === 'F' ? '#ff5733' : '#38bdf8', 7);
+
+      if (wiz.sigils.length === 3) {
+        const spell = findSpellByCombo(wiz.sigils);
+        if (spell) {
+          if (wiz.mana < spell.manaCost) {
+            if (wiz.id === 'player') {
+              SoundEngine.playClearCombo();
+              spawnFloatingText(wiz.x, wiz.y - 1.1, 'Недостаточно маны!', '#60a5fa');
+            }
+            setTimeout(() => {
+              if (wiz.sigils.length === 3 && !wiz.activeSpell) {
+                clearWizardSigils(wiz);
+                if (wiz.id === 'player') updateHUD();
+              }
+            }, 350);
+          } else {
+            wiz.activeSpell = spell;
+            wiz.castElapsed = 0;
+            wiz.castReady = false;
+            if (wiz.id === 'player') {
+              SoundEngine.startCastCharge(spell.castTime);
+            }
+          }
+        }
+      }
+
+      if (wiz.id === 'player') updateHUD();
+    }
+
+    function performDashOrJump(wiz, ctrl) {
+      if (wiz.stamina < 1.0) {
+        if (wiz.id === 'player') {
+          spawnFloatingText(wiz.x, wiz.y - 1.0, 'Нет выносливости', '#94a3b8');
+        }
+        return false;
+      }
+
+      // Determine intent from left stick:
+      // If left stick is NOT pressed OR tilted UP -> Jump (or Double Jump in air)
+      // If left stick is tilted LEFT, RIGHT, or DOWN -> Directional Dash
+      const hasHorizontal = Math.abs(ctrl.moveX) > 0.35;
+      const isDown = ctrl.leftStickRawY > 0.45;
+      const isUp = ctrl.leftStickRawY < -0.45;
+
+      if (!ctrl.leftStickActive || (isUp && !hasHorizontal)) {
+        // JUMP / DOUBLE JUMP
+        if (wiz.onGround || wiz.jumpsUsed < 2) {
+          const isDouble = !wiz.onGround;
+          wiz.stamina -= 1.0;
+          wiz.vy = -7.3;
+          wiz.onGround = false;
+          wiz.jumpsUsed += 1;
+          if (wiz.id === 'player') SoundEngine.playJump(isDouble);
+          spawnBurstParticles(wiz.x, wiz.y, '#6ee7b7', 12);
+          if (wiz.id === 'player') updateHUD();
+          return true;
+        }
+      } else if (hasHorizontal || isDown) {
+        // DIRECTIONAL DASH
+        wiz.stamina -= 1.0;
+        wiz.dashTimer = 0.19;
+        let dx = hasHorizontal ? Math.sign(ctrl.moveX) : 0;
+        let dy = isDown ? 0.85 : 0;
+        if (dx === 0 && dy === 0) dx = wiz.facing;
+        const len = Math.hypot(dx, dy) || 1;
+        wiz.dashVx = (dx / len) * 11.5;
+        wiz.dashVy = (dy / len) * 9.5;
+        if (dx !== 0) wiz.facing = Math.sign(dx);
+        if (wiz.id === 'player') SoundEngine.playDash();
+        spawnBurstParticles(wiz.x, wiz.y - 0.35, '#a7f3d0', 14);
+        if (wiz.id === 'player') updateHUD();
+        return true;
+      }
+      return false;
+    }
+
+    function executeWizardSpell(wiz, angle) {
+      const spell = wiz.activeSpell;
+      if (!spell || !wiz.castReady) return;
+
+      if (wiz.mana < spell.manaCost) {
+        clearWizardSigils(wiz);
+        if (wiz.id === 'player') updateHUD();
+        return;
+      }
+
+      // Spend mana & break invisibility on any cast
+      wiz.mana -= spell.manaCost;
+      if (wiz.invisibleTimer > 0) {
+        wiz.invisibleTimer = 0;
+      }
+
+      SoundEngine.playSpellCast(spell.id);
+
+      const originX = wiz.x + Math.cos(angle) * 0.35;
+      const originY = (wiz.y - 0.42) + Math.sin(angle) * 0.35;
+      const target = wiz.id === 'player' ? bot : player;
+
+      switch (spell.id) {
+        case 'shabyyl': {
+          // [F, F, F] Fast direct beam/bolt across the 10m arena with evaporating mana trail
+          projectiles.push({
+            kind: 'shabyyl',
+            owner: wiz.id,
+            x: originX,
+            y: originY,
+            vx: Math.cos(angle) * 15.5,
+            vy: Math.sin(angle) * 15.5,
+            radius: 0.14,
+            damage: 1,
+            piercing: false,
+            life: 1.2,
+            trail: []
+          });
+          spawnBurstParticles(originX, originY, '#ff5733', 14);
+          break;
+        }
+
+        case 'juldyzdar': {
+          // [F, F, E] Starfall cloud for 5 seconds above aimed point or enemy
+          let cloudX = wiz.x + Math.cos(angle) * 4.5;
+          // If aiming roughly toward opponent and opponent isn't invisible, snap near opponent X
+          if (target.invisibleTimer <= 0 && Math.sign(Math.cos(angle)) === Math.sign(target.x - wiz.x)) {
+            cloudX = target.x + (Math.random() - 0.5) * 0.6;
+          }
+          cloudX = Math.max(0.8, Math.min(WORLD_WIDTH - 0.8, cloudX));
+          starClouds.push({
+            owner: wiz.id,
+            x: cloudX,
+            y: 0.65,
+            duration: 5.0,
+            spawnTick: 0.25
+          });
+          spawnFloatingText(cloudX, 0.9, 'Juldyzdar', '#fde047');
+          break;
+        }
+
+        case 'jebe': {
+          // [F, E, E] Glowing bow shoots piercing arrow through shields & destructible walls
+          projectiles.push({
+            kind: 'jebe',
+            owner: wiz.id,
+            x: originX,
+            y: originY,
+            vx: Math.cos(angle) * 18.0,
+            vy: Math.sin(angle) * 18.0,
+            angle,
+            radius: 0.13,
+            damage: 1,
+            piercing: true,
+            life: 1.2,
+            trail: []
+          });
+          spawnBurstParticles(originX, originY, '#38bdf8', 16);
+          break;
+        }
+
+        case 'otshashy': {
+          // [F, E, F] Short-range firework fan burst (~2.5m range, 2 damage)
+          const spreadCount = 7;
+          for (let i = 0; i < spreadCount; i++) {
+            const offset = ((i / (spreadCount - 1)) - 0.5) * 0.68;
+            const a = angle + offset;
+            projectiles.push({
+              kind: 'otshashy',
+              owner: wiz.id,
+              x: originX,
+              y: originY,
+              vx: Math.cos(a) * 10.5,
+              vy: Math.sin(a) * 10.5,
+              radius: 0.16,
+              damage: 2,
+              piercing: false,
+              life: 0.25, // ~2.6 meters range
+              hitIds: new Set(),
+              trail: []
+            });
+          }
+          spawnBurstParticles(originX, originY, '#fb923c', 22);
+          break;
+        }
+
+        case 'qorgay': {
+          // [E, E, E] Hemispherical barrier in front of wizard blocking 1 projectile (except Jebe)
+          wiz.shieldHp = 1;
+          wiz.shieldAngle = angle;
+          wiz.shieldTimer = 8.0;
+          spawnBurstParticles(wiz.x + Math.cos(angle) * 0.45, wiz.y - 0.4, '#38bdf8', 18);
+          break;
+        }
+
+        case 'densaylyq': {
+          // [E, E, F] Restore HP to max (3)
+          wiz.hp = wiz.maxHp;
+          spawnBurstParticles(wiz.x, wiz.y - 0.4, '#4ade80', 26);
+          spawnFloatingText(wiz.x, wiz.y - 1.0, '+ Здоровье', '#4ade80');
+          break;
+        }
+
+        case 'kush': {
+          // [E, F, F] Restore Mana to max (4)
+          wiz.mana = wiz.maxMana;
+          spawnBurstParticles(wiz.x, wiz.y - 0.4, '#38bdf8', 26);
+          spawnFloatingText(wiz.x, wiz.y - 1.0, '+ Мана', '#38bdf8');
+          break;
+        }
+
+        case 'korinbey': {
+          // [E, F, E] Invisibility until next spell cast (or 10s max)
+          wiz.invisibleTimer = 10.0;
+          spawnBurstParticles(wiz.x, wiz.y - 0.4, '#c084fc', 24);
+          spawnFloatingText(wiz.x, wiz.y - 1.0, 'Невидимость', '#c084fc');
+          break;
+        }
+      }
+
+      clearWizardSigils(wiz);
+      if (wiz.id === 'player') updateHUD();
+    }
+
+    function damageWizard(wiz, amount) {
+      if (isGameOver) return;
+      wiz.hp = Math.max(0, wiz.hp - amount);
+      wiz.hitFlash = 0.25;
+      SoundEngine.playDamage();
+      spawnBurstParticles(wiz.x, wiz.y - 0.4, '#ef4444', 20);
+      spawnFloatingText(wiz.x, wiz.y - 0.95, `-${amount}`, '#f87171');
+      if (wiz.id === 'player') updateHUD();
+
+      if (wiz.hp <= 0) {
+        isGameOver = true;
+        const endModal = document.getElementById('endGameModal');
+        const title = document.getElementById('endGameTitle');
+        const sub = document.getElementById('endGameSubtitle');
+        if (wiz.id === 'bot') {
+          SoundEngine.playVictory();
+          title.textContent = 'Победа!';
+          title.style.color = '#f3c65f';
+          sub.textContent = 'Соперник повержен! Мастерство сигилов принесло вам триумф.';
+        } else {
+          SoundEngine.playDefeat();
+          title.textContent = 'Поражение';
+          title.style.color = '#f87171';
+          sub.textContent = 'Ваше здоровье иссякло. Изучите комбинации соперника и попробуйте снова!';
+        }
+        endModal.classList.add('open');
+      }
+    }
+
+    // =========================================================================
+    // 6. BOT AI LOGIC (Tactical distance, corner escape, counters & combos)
+    // =========================================================================
+    function updateBotAI(dt) {
+      if (isGameOver) return;
+
+      const playerVisible = player.invisibleTimer <= 0;
+      const distToPlayer = playerVisible ? (player.x - bot.x) : (Math.sin(performance.now() * 0.001) * 3);
+      const absDist = Math.abs(distToPlayer);
+
+      // Update aim angle toward player if visible
+      if (playerVisible) {
+        botAI.aimAngle = Math.atan2((player.y - 0.38) - (bot.y - 0.38), player.x - bot.x);
+        bot.facing = distToPlayer >= 0 ? 1 : -1;
+      }
+
+      // 1. Movement & Corner Escape
+      botAI.thinkTimer -= dt;
+      if (botAI.thinkTimer <= 0) {
+        botAI.thinkTimer = 0.28 + Math.random() * 0.2;
+
+        // Check if cornered near left or right wall with player closing in
+        const nearLeftWall = bot.x < 1.15;
+        const nearRightWall = bot.x > WORLD_WIDTH - 1.15;
+        if ((nearLeftWall || nearRightWall) && absDist < 3.2 && bot.stamina >= 1.0) {
+          // Jump + Dash across the player to escape the corner!
+          performDashOrJump(bot, { leftStickActive: false, moveX: 0, leftStickRawY: -1 });
+          setTimeout(() => {
+            if (!isPaused && !isGameOver && bot.stamina >= 1.0) {
+              const escapeDir = nearLeftWall ? 1 : -1;
+              performDashOrJump(bot, { leftStickActive: true, moveX: escapeDir, leftStickRawY: 0 });
+            }
+          }, 140);
+        } else if (!playerVisible) {
+          // Wander cautiously when player is invisible
+          botAI.desiredMoveX = Math.sin(performance.now() * 0.002) * 0.6;
+        } else {
+          // Keep optimal mid-range distance (~4.0 - 5.2m)
+          const idealDist = 4.4;
+          if (absDist < idealDist - 0.8) {
+            botAI.desiredMoveX = -Math.sign(distToPlayer) * 0.85;
+          } else if (absDist > idealDist + 0.9) {
+            botAI.desiredMoveX = Math.sign(distToPlayer) * 0.85;
+          } else {
+            botAI.desiredMoveX = (Math.random() - 0.5) * 0.5;
+          }
+        }
+      }
+
+      // Dodge incoming projectiles with jump/dash
+      const incoming = projectiles.find(p => p.owner === 'player' && Math.hypot(p.x - bot.x, p.y - (bot.y - 0.4)) < 2.2);
+      if (incoming && bot.stamina >= 1.0 && Math.random() < 0.08) {
+        performDashOrJump(bot, { leftStickActive: false, moveX: 0, leftStickRawY: -1 });
+      }
+
+      // 2. Spell Selection & Casting
+      if (bot.castReady) {
+        botAI.releaseDelay -= dt;
+        if (botAI.releaseDelay <= 0) {
+          // If player went invisible during an offensive cast, hold fire briefly or fire blindly
+          executeWizardSpell(bot, botAI.aimAngle);
+          botAI.plannedCombo = null;
+          botAI.sigilCooldown = 0.55;
+        }
+        return;
+      }
+
+      if (bot.sigils.length === 0 && !botAI.plannedCombo) {
+        // Choose tactical spell based on state
+        if (bot.hp <= 1 && bot.mana >= 2) {
+          botAI.plannedCombo = ['E', 'E', 'F']; // Densaýlyq (Heal)
+        } else if (bot.mana <= 1) {
+          botAI.plannedCombo = ['E', 'F', 'F']; // Kúsh (Restore Mana)
+        } else if (playerVisible && player.activeSpell && ['shabyyl', 'jebe', 'otshashy'].includes(player.activeSpell.id) && bot.shieldHp <= 0 && bot.mana >= 1) {
+          botAI.plannedCombo = ['E', 'E', 'E']; // Qorǵaý (Shield counter)
+        } else if (playerVisible && player.shieldHp > 0 && bot.mana >= 2) {
+          botAI.plannedCombo = ['F', 'E', 'E']; // Jebe (Pierces player shield!)
+        } else if (playerVisible && absDist < 2.3 && bot.mana >= 1) {
+          botAI.plannedCombo = ['F', 'E', 'F']; // Otshashý (Close range burst)
+        } else {
+          // Pick offensive or stealth combo affordable with current mana
+          const choices = [
+            { combo: ['F', 'F', 'F'], cost: 1 }, // Shabýyl
+            { combo: ['F', 'F', 'E'], cost: 2 }, // Juldyzdar
+            { combo: ['F', 'E', 'E'], cost: 2 }, // Jebe
+            { combo: ['E', 'F', 'E'], cost: 3 }  // Kórinbeý
+          ].filter(c => c.cost <= bot.mana);
+
+          const picked = choices.length > 0
+            ? choices[Math.floor(Math.random() * choices.length)].combo
+            : ['E', 'F', 'F'];
+          botAI.plannedCombo = picked;
+        }
+      }
+
+      if (botAI.plannedCombo && bot.sigils.length < 3) {
+        botAI.sigilCooldown -= dt;
+        if (botAI.sigilCooldown <= 0) {
+          const nextSigil = botAI.plannedCombo[bot.sigils.length];
+          addSigilToWizard(bot, nextSigil);
+          botAI.sigilCooldown = 0.32 + Math.random() * 0.18;
+          if (bot.sigils.length === 3) {
+            botAI.releaseDelay = 0.25 + Math.random() * 0.25;
+          }
+        }
+      }
+    }
+
+    // =========================================================================
+    // 7. PHYSICS, COLLISIONS & SIMULATION LOOP
+    // =========================================================================
+    function updateWizardPhysics(wiz, moveInputX, dt) {
+      wiz.animPhase += dt * 6;
+      if (wiz.hitFlash > 0) wiz.hitFlash = Math.max(0, wiz.hitFlash - dt);
+      if (wiz.invisibleTimer > 0) wiz.invisibleTimer = Math.max(0, wiz.invisibleTimer - dt);
+      if (wiz.shieldTimer > 0) {
+        wiz.shieldTimer -= dt;
+        if (wiz.shieldTimer <= 0) wiz.shieldHp = 0;
+      }
+
+      // Automatic stamina regen: 1 cell per second
+      if (wiz.stamina < wiz.maxStamina) {
+        wiz.stamina = Math.min(wiz.maxStamina, wiz.stamina + 1.0 * dt);
+      }
+
+      // Cast preparation progress
+      if (wiz.activeSpell && !wiz.castReady) {
+        wiz.castElapsed += dt;
+        if (wiz.castElapsed >= wiz.activeSpell.castTime) {
+          wiz.castElapsed = wiz.activeSpell.castTime;
+          wiz.castReady = true;
+          // Auto-cast self-targeted utility spells immediately when ready if player isn't holding aim stick,
+          // OR let player release aim stick for directional spells!
+          if (wiz.id === 'player' && !inputState.aimActive &&
+              ['qorgay', 'densaylyq', 'kush', 'korinbey'].includes(wiz.activeSpell.id)) {
+            executeWizardSpell(wiz, wiz.facing === 1 ? 0 : Math.PI);
+          }
+        }
+      }
+
+      // Dash vs Standard Horizontal Movement
+      if (wiz.dashTimer > 0) {
+        wiz.dashTimer -= dt;
+        wiz.vx = wiz.dashVx;
+        wiz.vy = wiz.dashVy;
+      } else {
+        const speed = 3.9;
+        wiz.vx = moveInputX * speed;
+        if (Math.abs(moveInputX) > 0.1 && !inputState.aimActive) {
+          wiz.facing = Math.sign(moveInputX);
+        }
+        wiz.vy += GRAVITY * dt;
+      }
+
+      // Wind Streams (Updrafts)
+      for (const ws of windStreams) {
+        if (Math.abs(wiz.x - ws.x) < ws.width * 0.5 && wiz.y <= ws.bottomY && wiz.y >= ws.topY) {
+          wiz.vy -= 21.5 * dt;
+          wiz.vy = Math.max(wiz.vy, -4.4);
+          wiz.onGround = false;
+          if (wiz.id === 'player') SoundEngine.playWindUpdraft(dt);
+        }
+      }
+
+      const prevY = wiz.y;
+      wiz.x += wiz.vx * dt;
+      wiz.y += wiz.vy * dt;
+
+      // Arena bounds (0.35m padding from walls)
+      wiz.x = Math.max(0.35, Math.min(WORLD_WIDTH - 0.35, wiz.x));
+
+      // Destructible walls horizontal collision
+      for (const wall of destructibleWalls) {
+        if (wall.hp <= 0) continue;
+        if (wiz.y > wall.y + 0.05 && (wiz.y - wiz.height) < wall.y + wall.h) {
+          if (wiz.x + wiz.radius > wall.x && wiz.x - wiz.radius < wall.x + wall.w) {
+            if (wiz.x < wall.x + wall.w * 0.5) {
+              wiz.x = wall.x - wiz.radius;
+            } else {
+              wiz.x = wall.x + wall.w + wiz.radius;
+            }
+          }
+        }
+      }
+
+      // One-way platforms landing
+      if (wiz.vy >= 0) {
+        for (const plat of platforms) {
+          if (plat.hp <= 0) continue;
+          if (prevY <= plat.y + 0.06 && wiz.y >= plat.y &&
+              wiz.x + wiz.radius * 0.6 >= plat.x && wiz.x - wiz.radius * 0.6 <= plat.x + plat.w) {
+            wiz.y = plat.y;
+            wiz.vy = 0;
+            wiz.onGround = true;
+            wiz.jumpsUsed = 0;
+          }
+        }
+      }
+
+      // Ground landing
+      if (wiz.y >= GROUND_Y) {
+        wiz.y = GROUND_Y;
+        wiz.vy = 0;
+        wiz.onGround = true;
+        wiz.jumpsUsed = 0;
+      }
+    }
+
+    function updateProjectilesAndClouds(dt) {
+      // Update Star Clouds (Juldyzdar)
+      for (let i = starClouds.length - 1; i >= 0; i--) {
+        const c = starClouds[i];
+        c.duration -= dt;
+        c.spawnTick -= dt;
+        if (c.spawnTick <= 0) {
+          c.spawnTick = 0.42;
+          SoundEngine.playStarDrop();
+          const dropX = c.x + (Math.random() - 0.5) * 1.1;
+          projectiles.push({
+            kind: 'star',
+            owner: c.owner,
+            x: dropX,
+            y: c.y + 0.15,
+            vx: (Math.random() - 0.5) * 0.6,
+            vy: 6.8,
+            radius: 0.14,
+            damage: 1,
+            piercing: false,
+            life: 1.5,
+            trail: []
+          });
+        }
+        if (c.duration <= 0) {
+          starClouds.splice(i, 1);
+        }
+      }
+
+      // Update Projectiles
+      for (let i = projectiles.length - 1; i >= 0; i--) {
+        const p = projectiles[i];
+        p.life -= dt;
+        p.trail.push({ x: p.x, y: p.y, alpha: 1.0 });
+        if (p.trail.length > 14) p.trail.shift();
+        p.trail.forEach(t => t.alpha *= 0.88);
+
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+
+        // Bounds & Ground check
+        if (p.life <= 0 || p.x < 0 || p.x > WORLD_WIDTH || p.y >= GROUND_Y || p.y < 0) {
+          spawnBurstParticles(p.x, Math.min(p.y, GROUND_Y), p.kind === 'jebe' ? '#38bdf8' : '#fb923c', 8);
+          projectiles.splice(i, 1);
+          continue;
+        }
+
+        // Platform collision (stars & bolts break on platforms)
+        let hitTerrain = false;
+        for (const plat of platforms) {
+          if (plat.hp <= 0) continue;
+          if (p.x >= plat.x && p.x <= plat.x + plat.w && p.y >= plat.y && p.y <= plat.y + plat.h) {
+            plat.hp -= 1;
+            spawnBurstParticles(p.x, p.y, '#94a3b8', 10);
+            if (!p.piercing) hitTerrain = true;
+            break;
+          }
+        }
+        if (hitTerrain) {
+          projectiles.splice(i, 1);
+          continue;
+        }
+
+        // Destructible walls collision (Jebe pierces and damages; others hit and damage)
+        for (const wall of destructibleWalls) {
+          if (wall.hp <= 0) continue;
+          if (p.x + p.radius >= wall.x && p.x - p.radius <= wall.x + wall.w &&
+              p.y + p.radius >= wall.y && p.y - p.radius <= wall.y + wall.h) {
+            wall.hp -= p.damage;
+            if (wall.hp <= 0) SoundEngine.playWallBreak();
+            spawnBurstParticles(p.x, p.y, '#cbd5e1', 12);
+            if (!p.piercing) {
+              hitTerrain = true;
+              break;
+            }
+          }
+        }
+        if (hitTerrain) {
+          projectiles.splice(i, 1);
+          continue;
+        }
+
+        // Target Wizard & Shield Collision
+        const target = p.owner === 'player' ? bot : player;
+        const wizCenterY = target.y - 0.38;
+        const distToTarget = Math.hypot(p.x - target.x, p.y - wizCenterY);
+
+        // Check Shield Qorǵaý first (blocks 1 projectile except Jebe)
+        if (target.shieldHp > 0 && distToTarget < 0.62 && !p.piercing) {
+          target.shieldHp = 0;
+          SoundEngine.playShieldBlock(false);
+          spawnBurstParticles(p.x, p.y, '#38bdf8', 22);
+          spawnFloatingText(target.x, target.y - 0.95, 'Блок!', '#38bdf8');
+          projectiles.splice(i, 1);
+          continue;
+        }
+
+        // Direct Hit on Target
+        if (distToTarget < target.radius + p.radius + 0.1) {
+          // For Otshashý fan burst, prevent multiple sparks from same burst dealing > 2 damage
+          if (p.kind === 'otshashy') {
+            if (p.hitIds.has(target.id)) {
+              projectiles.splice(i, 1);
+              continue;
+            }
+            // Mark all active otshashy sparks of this owner as having hit
+            projectiles.forEach(other => {
+              if (other.kind === 'otshashy' && other.owner === p.owner && other.hitIds) {
+                other.hitIds.add(target.id);
+              }
+            });
+          }
+
+          if (p.piercing && target.shieldHp > 0) {
+            target.shieldHp = 0;
+            SoundEngine.playShieldBlock(true);
+            spawnFloatingText(target.x, target.y - 1.15, 'Щит пробит!', '#38bdf8');
+          }
+
+          damageWizard(target, p.damage);
+          projectiles.splice(i, 1);
+        }
+      }
+    }
+
+    function spawnBurstParticles(wx, wy, color, count) {
+      for (let i = 0; i < count; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const spd = 0.8 + Math.random() * 3.4;
+        particles.push({
+          x: wx,
+          y: wy,
+          vx: Math.cos(a) * spd,
+          vy: Math.sin(a) * spd - 0.8,
+          size: 2.5 + Math.random() * 3.5,
+          color,
+          life: 0.35 + Math.random() * 0.35,
+          maxLife: 0.7
+        });
+      }
+    }
+
+    function spawnFloatingText(wx, wy, text, color) {
+      floatingTexts.push({
+        x: wx,
+        y: wy,
+        text,
+        color,
+        life: 1.0
+      });
+    }
+
+    function updateEffects(dt) {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const pt = particles[i];
+        pt.life -= dt;
+        pt.x += pt.vx * dt;
+        pt.y += pt.vy * dt;
+        pt.vy += 4.5 * dt;
+        if (pt.life <= 0) particles.splice(i, 1);
+      }
+
+      for (let i = floatingTexts.length - 1; i >= 0; i--) {
+        const ft = floatingTexts[i];
+        ft.life -= dt;
+        ft.y -= 0.65 * dt;
+        if (ft.life <= 0) floatingTexts.splice(i, 1);
+      }
+
+      windStreams.forEach(ws => ws.phase += dt * 4.5);
+    }
+
+    // =========================================================================
+    // 8. HUD SYNCHRONIZATION
+    // =========================================================================
+    function updateHUD() {
+      if (!player) return;
+
+      // Health cells
+      const hpEls = document.getElementById('hpCells').children;
+      for (let i = 0; i < 3; i++) {
+        hpEls[i].classList.toggle('active', i < player.hp);
+      }
+
+      // Mana cells
+      const manaEls = document.getElementById('manaCells').children;
+      for (let i = 0; i < 4; i++) {
+        manaEls[i].classList.toggle('active', i < player.mana);
+      }
+
+      // Stamina cells (smooth fill)
+      for (let i = 0; i < 2; i++) {
+        const fill = Math.max(0, Math.min(1, player.stamina - i));
+        document.getElementById(`stamFill${i}`).style.width = `${fill * 100}%`;
+      }
+      document.getElementById('btnDashAction').classList.toggle('no-stamina', player.stamina < 1.0);
+
+      // Top-center Sigil Slots
+      for (let i = 0; i < 3; i++) {
+        const slot = document.getElementById(`slot${i}`);
+        const sig = player.sigils[i];
+        slot.className = 'sigil-slot';
+        if (sig === 'F') {
+          slot.classList.add('filled-fire');
+          slot.innerHTML = FIRE_SVG_SMALL;
+        } else if (sig === 'E') {
+          slot.classList.add('filled-earth');
+          slot.innerHTML = EARTH_SVG_SMALL;
+        } else {
+          slot.innerHTML = '';
+        }
+      }
+
+      // Spell status & cast bar
+      const statusText = document.getElementById('spellStatusText');
+      const progWrap = document.getElementById('castProgressWrap');
+      const progBar = document.getElementById('castProgressBar');
+      const rightStick = document.getElementById('rightStickZone');
+
+      if (player.activeSpell) {
+        progWrap.style.display = 'block';
+        const pct = Math.min(100, (player.castElapsed / player.activeSpell.castTime) * 100);
+        progBar.style.width = `${pct}%`;
+
+        if (player.castReady) {
+          statusText.textContent = `${player.activeSpell.name} — Отпустите прицел!`;
+          statusText.style.color = '#fde047';
+          rightStick.classList.add('ready-to-fire');
+        } else {
+          statusText.textContent = `Подготовка: ${player.activeSpell.name}...`;
+          statusText.style.color = '#e2e8f0';
+          rightStick.classList.remove('ready-to-fire');
+        }
+      } else {
+        progWrap.style.display = 'none';
+        rightStick.classList.remove('ready-to-fire');
+        statusText.textContent = player.sigils.length === 0 ? 'Соберите 3 сигила' : `Выбрано: ${player.sigils.length} / 3`;
+        statusText.style.color = '#cbd5e1';
+      }
+    }
+
+    // =========================================================================
+    // 9. RENDERING (STEPPE FANTASY ARENA, WIZARDS, SIGIL OVERHEADS & FX)
+    // =========================================================================
+    function drawBackground() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+
+      // Twilight Steppe Sky Gradient
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, h);
+      skyGrad.addColorStop(0, '#0b101d');
+      skyGrad.addColorStop(0.55, '#17233b');
+      skyGrad.addColorStop(1, '#262b3d');
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      // Crescent Moon & Stars
+      const moonX = toScreenX(7.6);
+      const moonY = toScreenY(1.1);
+      const moonR = viewTransform.scale * 0.38;
+      ctx.save();
+      ctx.fillStyle = 'rgba(243, 198, 95, 0.14)';
+      ctx.beginPath();
+      ctx.arc(moonX, moonY, moonR * 1.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fef3c7';
+      ctx.beginPath();
+      ctx.arc(moonX, moonY, moonR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#11192c';
+      ctx.beginPath();
+      ctx.arc(moonX - moonR * 0.32, moonY - moonR * 0.15, moonR * 0.88, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // Distant Steppe Mountains & Balbal Silhouettes
+      ctx.fillStyle = '#111827';
+      ctx.beginPath();
+      ctx.moveTo(0, toScreenY(GROUND_Y));
+      ctx.lineTo(toScreenX(1.5), toScreenY(2.9));
+      ctx.lineTo(toScreenX(3.8), toScreenY(3.7));
+      ctx.lineTo(toScreenX(5.6), toScreenY(2.5));
+      ctx.lineTo(toScreenX(8.2), toScreenY(3.5));
+      ctx.lineTo(w, toScreenY(2.8));
+      ctx.lineTo(w, h);
+      ctx.lineTo(0, h);
+      ctx.closePath();
+      ctx.fill();
+
+      // Arena Floor
+      const groundScreenY = toScreenY(GROUND_Y);
+      const floorGrad = ctx.createLinearGradient(0, groundScreenY, 0, h);
+      floorGrad.addColorStop(0, '#334155');
+      floorGrad.addColorStop(0.15, '#1e293b');
+      floorGrad.addColorStop(1, '#090d16');
+      ctx.fillStyle = floorGrad;
+      ctx.fillRect(0, groundScreenY, w, h - groundScreenY);
+
+      // Golden Rune Trim on Arena Floor
+      ctx.strokeStyle = 'rgba(243, 198, 95, 0.45)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(toScreenX(0), groundScreenY);
+      ctx.lineTo(toScreenX(WORLD_WIDTH), groundScreenY);
+      ctx.stroke();
+
+      // Arena Side Boundary Pillars
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(toScreenX(0) - 18, toScreenY(1.2), 18, groundScreenY - toScreenY(1.2));
+      ctx.fillRect(toScreenX(WORLD_WIDTH), toScreenY(1.2), 18, groundScreenY - toScreenY(1.2));
+    }
+
+    function drawArenaObjects() {
+      const s = viewTransform.scale;
+
+      // Wind Streams (Updrafts)
+      for (const ws of windStreams) {
+        const x = toScreenX(ws.x - ws.width * 0.5);
+        const y = toScreenY(ws.topY);
+        const w = ws.width * s;
+        const h = (ws.bottomY - ws.topY) * s;
+
+        const grad = ctx.createLinearGradient(0, y + h, 0, y);
+        grad.addColorStop(0, 'rgba(110, 231, 183, 0.16)');
+        grad.addColorStop(1, 'rgba(110, 231, 183, 0.0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(x, y, w, h);
+
+        // Animated rising wind ribbons
+        ctx.strokeStyle = 'rgba(167, 243, 208, 0.42)';
+        ctx.lineWidth = 2;
+        for (let k = 0; k < 4; k++) {
+          const offset = ((ws.phase + k * 1.5) % 4) / 4;
+          const ry = y + h * (1 - offset);
+          const rx = x + w * (0.2 + 0.6 * ((k * 0.37) % 1));
+          ctx.beginPath();
+          ctx.moveTo(rx, ry);
+          ctx.lineTo(rx + Math.sin(ws.phase + k) * 6, ry - 22);
+          ctx.stroke();
+        }
+      }
+
+      // Stone Platforms
+      for (const plat of platforms) {
+        if (plat.hp <= 0) continue;
+        const px = toScreenX(plat.x);
+        const py = toScreenY(plat.y);
+        const pw = plat.w * s;
+        const ph = plat.h * s;
+
+        ctx.fillStyle = '#475569';
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(px, py, pw, ph, 6);
+        ctx.fill();
+        ctx.stroke();
+
+        // Cracks if damaged
+        if (plat.hp < plat.maxHp) {
+          ctx.strokeStyle = '#0f172a';
+          ctx.beginPath();
+          ctx.moveTo(px + pw * 0.35, py);
+          ctx.lineTo(px + pw * 0.45, py + ph * 0.7);
+          ctx.stroke();
+        }
+      }
+
+      // Destructible Walls
+      for (const wall of destructibleWalls) {
+        if (wall.hp <= 0) continue;
+        const wx = toScreenX(wall.x);
+        const wy = toScreenY(wall.y);
+        const ww = wall.w * s;
+        const wh = wall.h * s;
+
+        ctx.fillStyle = '#64748b';
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(wx, wy, ww, wh, 5);
+        ctx.fill();
+        ctx.stroke();
+
+        // Ornamental steppe carvings
+        ctx.strokeStyle = 'rgba(243, 198, 95, 0.45)';
+        ctx.strokeRect(wx + 4, wy + 8, ww - 8, wh - 16);
+
+        if (wall.hp < wall.maxHp) {
+          ctx.strokeStyle = '#0f172a';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(wx, wy + wh * 0.4);
+          ctx.lineTo(wx + ww * 0.7, wy + wh * 0.55);
+          ctx.lineTo(wx + ww * 0.4, wy + wh * 0.8);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Canvas Vector Sigil Icons (for overhead display above Opponent & Player)
+    function drawCanvasSigilBadge(cx, cy, radius, type) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      if (type === 'F') {
+        ctx.fillStyle = 'rgba(153, 27, 27, 0.92)';
+        ctx.strokeStyle = '#ff6b4a';
+      } else {
+        ctx.fillStyle = 'rgba(12, 74, 110, 0.92)';
+        ctx.strokeStyle = '#38bdf8';
+      }
+      ctx.lineWidth = 2;
+      ctx.fill();
+      ctx.stroke();
+
+      if (type === 'F') {
+        // Flame silhouette
+        ctx.fillStyle = '#fb923c';
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - radius * 0.65);
+        ctx.quadraticCurveTo(cx + radius * 0.62, cy - radius * 0.05, cx + radius * 0.42, cy + radius * 0.5);
+        ctx.quadraticCurveTo(cx, cy + radius * 0.72, cx - radius * 0.42, cy + radius * 0.5);
+        ctx.quadraticCurveTo(cx - radius * 0.62, cy - radius * 0.05, cx, cy - radius * 0.65);
+        ctx.fill();
+
+        ctx.fillStyle = '#fef08a';
+        ctx.beginPath();
+        ctx.arc(cx, cy + radius * 0.18, radius * 0.24, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // Earth crystal silhouette
+        ctx.fillStyle = '#38bdf8';
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - radius * 0.65);
+        ctx.lineTo(cx + radius * 0.55, cy - radius * 0.15);
+        ctx.lineTo(cx + radius * 0.36, cy + radius * 0.58);
+        ctx.lineTo(cx - radius * 0.36, cy + radius * 0.58);
+        ctx.lineTo(cx - radius * 0.55, cy - radius * 0.15);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(255,255,255,0.45)';
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - radius * 0.65);
+        ctx.lineTo(cx + radius * 0.25, cy - radius * 0.05);
+        ctx.lineTo(cx, cy + radius * 0.45);
+        ctx.lineTo(cx - radius * 0.25, cy - radius * 0.05);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    function drawWizard(wiz) {
+      const s = viewTransform.scale;
+      const sx = toScreenX(wiz.x);
+      const sy = toScreenY(wiz.y);
+      const h = wiz.height * s;
+      const w = wiz.radius * 2 * s;
+
+      // Invisibility handling
+      if (wiz.invisibleTimer > 0) {
+        if (wiz.id === 'bot') {
+          // Bot is completely invisible to player!
+          return;
+        }
+      }
+
+      ctx.save();
+      if (wiz.invisibleTimer > 0 && wiz.id === 'player') {
+        ctx.globalAlpha = 0.32;
+      }
+
+      // Ground Shadow
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, w * 0.55, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Wizard Cloak & Steppe Mage Hat
+      const bob = wiz.onGround ? Math.sin(wiz.animPhase) * 2.5 : -3;
+      ctx.fillStyle = wiz.hitFlash > 0 ? '#ffffff' : wiz.palette.robe;
+      ctx.strokeStyle = wiz.palette.trim;
+      ctx.lineWidth = 2;
+
+      // Robe body
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - h * 0.72 + bob);
+      ctx.lineTo(sx + w * 0.55, sy);
+      ctx.lineTo(sx - w * 0.55, sy);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Head & Glowing Eyes
+      const headY = sy - h * 0.78 + bob;
+      ctx.fillStyle = '#fde68a';
+      ctx.beginPath();
+      ctx.arc(sx, headY, w * 0.28, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Eyes facing direction
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.arc(sx + wiz.facing * (w * 0.12), headY - 1, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Pointed Steppe Sorcerer Hat (Sáýkele / Mage Cone)
+      ctx.fillStyle = wiz.palette.robe;
+      ctx.beginPath();
+      ctx.moveTo(sx - w * 0.42, headY - w * 0.14);
+      ctx.lineTo(sx + w * 0.42, headY - w * 0.14);
+      ctx.lineTo(sx - wiz.facing * 4, headY - h * 0.42);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Magic Staff
+      const staffX = sx + wiz.facing * (w * 0.46);
+      ctx.strokeStyle = '#d97706';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(staffX, sy);
+      ctx.lineTo(staffX + wiz.facing * 4, sy - h * 0.88 + bob);
+      ctx.stroke();
+
+      // Staff Orb
+      ctx.fillStyle = wiz.sigils.length > 0 && wiz.sigils[wiz.sigils.length - 1] === 'F' ? '#ff5733' : '#38bdf8';
+      ctx.beginPath();
+      ctx.arc(staffX + wiz.facing * 4, sy - h * 0.9 + bob, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Jebe Spectral Bow visual when preparing or firing Jebe
+      if (wiz.activeSpell && wiz.activeSpell.id === 'jebe') {
+        ctx.strokeStyle = '#7dd3fc';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(sx + wiz.facing * 12, sy - h * 0.5, 18, -Math.PI * 0.4, Math.PI * 0.4, wiz.facing === -1);
+        ctx.stroke();
+      }
+
+      // Shield Qorǵaý Hemispherical Barrier
+      if (wiz.shieldHp > 0) {
+        ctx.save();
+        ctx.strokeStyle = '#38bdf8';
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.22)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(sx, sy - h * 0.45, s * 0.52, wiz.shieldAngle - Math.PI * 0.48, wiz.shieldAngle + Math.PI * 0.48);
+        ctx.stroke();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      ctx.restore();
+
+      // OVERHEAD UI FOR BOT (HP pips + 3 Sigil Icons + Cast Progress Bar — NO Q/W!)
+      if (wiz.id === 'bot') {
+        const topY = sy - h * 1.28;
+
+        // Bot HP segments
+        for (let i = 0; i < wiz.maxHp; i++) {
+          ctx.fillStyle = i < wiz.hp ? '#ef4444' : 'rgba(255,255,255,0.18)';
+          ctx.fillRect(sx - 26 + i * 18, topY - 14, 15, 5);
+        }
+
+        // Bot Active Sigils (Graphical icons only)
+        if (wiz.sigils.length > 0) {
+          const badgeR = 11;
+          const spacing = 26;
+          const startX = sx - ((wiz.sigils.length - 1) * spacing) / 2;
+          wiz.sigils.forEach((sig, idx) => {
+            drawCanvasSigilBadge(startX + idx * spacing, topY - 34, badgeR, sig);
+          });
+
+          // Cast progress bar under bot's sigils
+          if (wiz.activeSpell) {
+            const pct = Math.min(1, wiz.castElapsed / wiz.activeSpell.castTime);
+            ctx.fillStyle = 'rgba(0,0,0,0.6)';
+            ctx.fillRect(sx - 34, topY - 20, 68, 4);
+            ctx.fillStyle = wiz.castReady ? '#fde047' : '#38bdf8';
+            ctx.fillRect(sx - 34, topY - 20, 68 * pct, 4);
+          }
+        }
+      }
+
+      // OVERHEAD CAST PROGRESS BAR FOR PLAYER
+      if (wiz.id === 'player' && wiz.activeSpell) {
+        const topY = sy - h * 1.24;
+        const pct = Math.min(1, wiz.castElapsed / wiz.activeSpell.castTime);
+        ctx.fillStyle = 'rgba(0,0,0,0.65)';
+        ctx.fillRect(sx - 32, topY - 8, 64, 5);
+        ctx.fillStyle = wiz.castReady ? '#fde047' : '#f3c65f';
+        ctx.fillRect(sx - 32, topY - 8, 64 * pct, 5);
+      }
+    }
+
+    function drawAimReticle() {
+      if (!player || !inputState.aimActive || isPaused || isGameOver) return;
+
+      const s = viewTransform.scale;
+      const startX = toScreenX(player.x);
+      const startY = toScreenY(player.y - 0.4);
+      const len = s * 2.2;
+      const endX = startX + Math.cos(inputState.aimAngle) * len;
+      const endY = startY + Math.sin(inputState.aimAngle) * len;
+
+      ctx.save();
+      ctx.strokeStyle = player.castReady ? '#fde047' : 'rgba(255, 255, 255, 0.45)';
+      ctx.lineWidth = player.castReady ? 3 : 2;
+      ctx.setLineDash([7, 6]);
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
+
+      ctx.setLineDash([]);
+      ctx.fillStyle = player.castReady ? '#fde047' : 'rgba(255,255,255,0.6)';
+      ctx.beginPath();
+      ctx.arc(endX, endY, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawProjectilesAndEffects() {
+      const s = viewTransform.scale;
+
+      // Star Clouds (Juldyzdar)
+      for (const c of starClouds) {
+        const cx = toScreenX(c.x);
+        const cy = toScreenY(c.y);
+        ctx.save();
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
+        ctx.strokeStyle = '#fde047';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, s * 0.65, s * 0.18, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Projectiles
+      for (const p of projectiles) {
+        // Evaporating Mana Trail
+        for (let i = 0; i < p.trail.length; i++) {
+          const t = p.trail[i];
+          ctx.fillStyle = p.kind === 'jebe'
+            ? `rgba(56, 189, 248, ${t.alpha * 0.45})`
+            : `rgba(255, 110, 50, ${t.alpha * 0.45})`;
+          ctx.beginPath();
+          ctx.arc(toScreenX(t.x), toScreenY(t.y), (i / p.trail.length) * p.radius * s, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        const px = toScreenX(p.x);
+        const py = toScreenY(p.y);
+
+        if (p.kind === 'jebe') {
+          // Piercing Glowing Arrow
+          ctx.save();
+          ctx.translate(px, py);
+          ctx.rotate(p.angle);
+          ctx.strokeStyle = '#e0f2fe';
+          ctx.fillStyle = '#38bdf8';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(-18, 0);
+          ctx.lineTo(16, 0);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(22, 0);
+          ctx.lineTo(10, -6);
+          ctx.lineTo(10, 6);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        } else if (p.kind === 'star') {
+          ctx.fillStyle = '#fde047';
+          ctx.beginPath();
+          ctx.arc(px, py, p.radius * s, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          // Shabýyl or Otshashý fiery mana orb
+          ctx.fillStyle = '#fef08a';
+          ctx.strokeStyle = '#ff4d2e';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(px, py, p.radius * s, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+
+      // Particles
+      for (const pt of particles) {
+        ctx.globalAlpha = Math.max(0, pt.life / pt.maxLife);
+        ctx.fillStyle = pt.color;
+        ctx.beginPath();
+        ctx.arc(toScreenX(pt.x), toScreenY(pt.y), pt.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+
+      // Floating Texts
+      ctx.font = '700 13px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      for (const ft of floatingTexts) {
+        ctx.globalAlpha = Math.min(1, ft.life * 1.4);
+        ctx.fillStyle = ft.color;
+        ctx.fillText(ft.text, toScreenX(ft.x), toScreenY(ft.y));
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // =========================================================================
+    // 10. MAIN ANIMATION LOOP
+    // =========================================================================
+    function gameLoop(timestamp) {
+      if (!lastTimestamp) lastTimestamp = timestamp;
+      const dt = Math.min((timestamp - lastTimestamp) / 1000, 0.05);
+      lastTimestamp = timestamp;
+
+      if (!isPaused && !isGameOver) {
+        const effInput = getEffectiveInput();
+        updateWizardPhysics(player, effInput.moveX, dt);
+        updateBotAI(dt);
+        updateWizardPhysics(bot, botAI.desiredMoveX, dt);
+        updateProjectilesAndClouds(dt);
+        updateEffects(dt);
+        updateHUD();
+      }
+
+      // Render frame
+      drawBackground();
+      drawArenaObjects();
+      drawAimReticle();
+      drawWizard(bot);
+      drawWizard(player);
+      drawProjectilesAndEffects();
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    window.onload = function () {
+      buildSpellbookUI();
+      initMatch();
+      requestAnimationFrame(gameLoop);
+    };
+  </script>
+</body>
+</html>
