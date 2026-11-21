@@ -40,15 +40,35 @@
       color: var(--text-main);
     }
 
-    #gameCanvas {
-      display: block;
+    /* Forced Landscape App Container */
+    #appContainer {
+      position: fixed;
+      top: 0;
+      left: 0;
       width: 100vw;
       height: 100vh;
+      overflow: hidden;
+      background-color: var(--bg-dark);
+    }
+
+    #appContainer.force-landscape {
+      width: 100vh;
+      height: 100vw;
+      transform: rotate(90deg);
+      transform-origin: top left;
+      left: 100vw;
+      top: 0;
+    }
+
+    #gameCanvas {
+      display: block;
+      width: 100%;
+      height: 100%;
     }
 
     /* HUD LAYER */
     #hud {
-      position: fixed;
+      position: absolute;
       inset: 0;
       pointer-events: none;
       z-index: 10;
@@ -216,6 +236,34 @@
       border-radius: 99px;
       margin-top: 5px;
       overflow: hidden;
+      display: none;
+    }
+
+    .cast-progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #f3c65f, #fde047);
+      transition: width 0.05s linear;
+    }
+
+    .clear-combo-btn {
+      position: absolute;
+      right: 8px;
+      top: 8px;
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      color: var(--text-muted);
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      pointer-events: auto;
+    }
+
     /* TOP RIGHT: Spellbook & Audio Controls */
     .top-right-controls {
       pointer-events: auto;
@@ -419,9 +467,9 @@
       border-color: #64748b;
     }
 
-    /* MODALS (Spellbook, Victory, Defeat, Orientation) */
+    /* MODALS (Spellbook, Victory, Defeat) */
     .modal-overlay {
-      position: fixed;
+      position: absolute;
       inset: 0;
       background: rgba(7, 10, 16, 0.84);
       backdrop-filter: blur(10px);
@@ -591,29 +639,29 @@
       transform: scale(0.96);
     }
 
-    /* Portrait Orientation Warning */
-    #portraitWarning {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: #0b0e14;
-      z-index: 100;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 24px;
-      gap: 16px;
-    }
-    @media screen and (orientation: portrait) and (max-width: 768px) {
-      #portraitWarning {
-        display: flex;
-      }
-    }
-
     /* Responsive adjustments for smaller mobile landscape screens */
-    @media (max-height: 440px) {
+    @media (max-height: 440px), (max-width: 440px) {
       .stats-panel { padding: 7px 10px; gap: 5px; min-width: 148px; }
+      .combo-panel { padding: 5px 14px 7px; min-width: 190px; }
+      .sigil-slot { width: 32px; height: 32px; }
+      .stick-zone-left, .stick-zone-right { width: 112px; height: 112px; }
+      .stick-knob { width: 44px; height: 44px; }
+      .controls-right-cluster { width: 224px; height: 194px; }
+      .btn-fire { width: 70px; height: 70px; right: 126px; }
+      .btn-earth { width: 70px; height: 70px; right: 10px; bottom: 122px; }
+      .btn-dash { width: 56px; height: 56px; right: 94px; bottom: 86px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Always-Landscape Container -->
+  <div id="appContainer">
+    <!-- Game Arena Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- HUD Interface matching the exact wireframe -->
+    <div id="hud">
       .combo-panel { padding: 5px 14px 7px; min-width: 190px; }
       .sigil-slot { width: 32px; height: 32px; }
       .stick-zone-left, .stick-zone-right { width: 112px; height: 112px; }
@@ -784,15 +832,15 @@
       <div class="spell-grid" id="spellGridContainer"></div>
     </div>
   </div>
-
-  <!-- Game Over / Victory Modal -->
-  <div class="modal-overlay" id="endGameModal">
-    <div class="modal-card end-card">
-      <h2 class="end-title" id="endGameTitle">Победа!</h2>
-      <p class="end-subtitle" id="endGameSubtitle">Вы одолели соперника в магической дуэли.</p>
-      <button class="restart-btn" id="btnRestartGame">Начать заново</button>
+      <!-- Game Over / Victory Modal -->
+      <div class="modal-overlay" id="endGameModal">
+        <div class="modal-card end-card">
+          <h2 class="end-title" id="endGameTitle">Победа!</h2>
+          <p class="end-subtitle" id="endGameSubtitle">Вы одолели соперника в магической дуэли.</p>
+          <button class="restart-btn" id="btnRestartGame">Начать заново</button>
+        </div>
+      </div>
     </div>
-  </div>
 
   <script>
     /**
@@ -1205,9 +1253,27 @@
       };
     })();
 
-    // Unlock Web Audio on first user interaction anywhere
-    ['pointerdown', 'keydown'].forEach(evt => {
-      window.addEventListener(evt, () => SoundEngine.init(), { passive: true });
+    // Attempt Fullscreen & Native Landscape Lock on First Interaction (safe fallback to CSS rotation)
+    let orientationLockAttempted = false;
+    async function requestLandscapeExperience() {
+      SoundEngine.init();
+      if (orientationLockAttempted) return;
+      orientationLockAttempted = true;
+      try {
+        const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+        if (isTouchDevice && document.documentElement.requestFullscreen && !document.fullscreenElement) {
+          await document.documentElement.requestFullscreen().catch(() => {});
+        }
+        if (screen.orientation && screen.orientation.lock) {
+          await screen.orientation.lock('landscape').catch(() => {});
+        }
+      } catch (_) {
+        // iOS Safari or restricted webviews gracefully rely on CSS force-landscape rotation
+      }
+    }
+
+    ['pointerdown', 'touchstart', 'keydown'].forEach(evt => {
+      window.addEventListener(evt, requestLandscapeExperience, { passive: true });
     });
 
     // =========================================================================
@@ -1341,6 +1407,7 @@
     // =========================================================================
     // 2. CANVAS & LOGICAL ARENA COORDINATE SYSTEM (10m wide x 5.6m high)
     // =========================================================================
+    const appContainer = document.getElementById('appContainer');
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
 
@@ -1349,27 +1416,58 @@
     const GROUND_Y = 4.85;      // Ground level in meters
     const GRAVITY = 15.5;       // m/s^2
 
+    let isForcedLandscape = false;
+    let logicalViewport = { width: window.innerWidth, height: window.innerHeight };
     let viewTransform = { scale: 100, offsetX: 0, offsetY: 0 };
 
+    function getLogicalViewportSize() {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      isForcedLandscape = vh > vw;
+      if (isForcedLandscape) {
+        appContainer.classList.add('force-landscape');
+        return { width: vh, height: vw };
+      } else {
+        appContainer.classList.remove('force-landscape');
+        return { width: vw, height: vh };
+      }
+    }
+
+    // Converts screen (clientX, clientY) into unrotated logical app coordinates
+    function screenToLogicalPoint(clientX, clientY) {
+      if (!isForcedLandscape) {
+        return { x: clientX, y: clientY };
+      }
+      // Because #appContainer is rotated 90deg clockwise around top-left and shifted left: 100vw:
+      // screenX = vw - logicalY  => logicalY = vw - clientX
+      // screenY = logicalX       => logicalX = clientY
+      return {
+        x: clientY,
+        y: window.innerWidth - clientX
+      };
+    }
+
     function resizeCanvas() {
+      logicalViewport = getLogicalViewportSize();
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = window.innerWidth * dpr;
-      canvas.height = window.innerHeight * dpr;
+      canvas.width = logicalViewport.width * dpr;
+      canvas.height = logicalViewport.height * dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      const scaleX = window.innerWidth / WORLD_WIDTH;
-      const scaleY = window.innerHeight / WORLD_HEIGHT;
+      const scaleX = logicalViewport.width / WORLD_WIDTH;
+      const scaleY = logicalViewport.height / WORLD_HEIGHT;
       viewTransform.scale = Math.min(scaleX, scaleY);
-      viewTransform.offsetX = (window.innerWidth - WORLD_WIDTH * viewTransform.scale) * 0.5;
-      viewTransform.offsetY = (window.innerHeight - WORLD_HEIGHT * viewTransform.scale) * 0.5;
+      viewTransform.offsetX = (logicalViewport.width - WORLD_WIDTH * viewTransform.scale) * 0.5;
+      viewTransform.offsetY = (logicalViewport.height - WORLD_HEIGHT * viewTransform.scale) * 0.5;
     }
     window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 80));
     resizeCanvas();
 
     function toScreenX(wx) { return viewTransform.offsetX + wx * viewTransform.scale; }
     function toScreenY(wy) { return viewTransform.offsetY + wy * viewTransform.scale; }
-    function toWorldX(sx) { return (sx - viewTransform.offsetX) / viewTransform.scale; }
-    function toWorldY(sy) { return (sy - viewTransform.offsetY) / viewTransform.scale; }
+    function toWorldX(lx) { return (lx - viewTransform.offsetX) / viewTransform.scale; }
+    function toWorldY(ly) { return (ly - viewTransform.offsetY) / viewTransform.scale; }
 
     // =========================================================================
     // 3. GAME STATE & ENTITIES
@@ -1514,21 +1612,21 @@
 
     function updateLeftStick(clientX, clientY) {
       const rect = leftZone.getBoundingClientRect();
-      const cx = rect.left + rect.width / 2;
-      const cy = rect.top + rect.height / 2;
-      const maxR = rect.width * 0.36;
+      const center = screenToLogicalPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      const pt = screenToLogicalPoint(clientX, clientY);
+      const zoneRadius = (isForcedLandscape ? rect.height : rect.width) * 0.36;
 
-      let dx = clientX - cx;
-      let dy = clientY - cy;
+      let dx = pt.x - center.x;
+      let dy = pt.y - center.y;
       const dist = Math.hypot(dx, dy);
-      if (dist > maxR) {
-        dx = (dx / dist) * maxR;
-        dy = (dy / dist) * maxR;
+      if (dist > zoneRadius) {
+        dx = (dx / dist) * zoneRadius;
+        dy = (dy / dist) * zoneRadius;
       }
 
       leftKnob.style.transform = `translate(${dx}px, ${dy}px)`;
-      const normX = dx / maxR;
-      const normY = dy / maxR;
+      const normX = dx / zoneRadius;
+      const normY = dy / zoneRadius;
 
       // Left stick only moves left/right (vertical doesn't move character directly, only informs dash)
       inputState.moveX = Math.abs(normX) > 0.15 ? normX : 0;
@@ -1571,20 +1669,20 @@
 
     function updateRightStick(clientX, clientY) {
       const rect = rightZone.getBoundingClientRect();
-      const cx = rect.left + rect.width / 2;
-      const cy = rect.top + rect.height / 2;
-      const maxR = rect.width * 0.38;
+      const center = screenToLogicalPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      const pt = screenToLogicalPoint(clientX, clientY);
+      const zoneRadius = (isForcedLandscape ? rect.height : rect.width) * 0.38;
 
-      let dx = clientX - cx;
-      let dy = clientY - cy;
+      let dx = pt.x - center.x;
+      let dy = pt.y - center.y;
       const dist = Math.hypot(dx, dy);
-      if (dist > maxR) {
-        dx = (dx / dist) * maxR;
-        dy = (dy / dist) * maxR;
+      if (dist > zoneRadius) {
+        dx = (dx / dist) * zoneRadius;
+        dy = (dy / dist) * zoneRadius;
       }
 
       rightKnob.style.transform = `translate(${dx}px, ${dy}px)`;
-      inputState.aimMagnitude = Math.min(dist / maxR, 1);
+      inputState.aimMagnitude = Math.min(dist / zoneRadius, 1);
       if (dist > 8) {
         inputState.aimAngle = Math.atan2(dy, dx);
         player.facing = Math.cos(inputState.aimAngle) >= 0 ? 1 : -1;
@@ -1719,8 +1817,9 @@
       if (isPaused || isGameOver || e.pointerType === 'touch') return;
       canvasMouseAiming = true;
       inputState.aimActive = true;
-      const wx = toWorldX(e.clientX);
-      const wy = toWorldY(e.clientY);
+      const pt = screenToLogicalPoint(e.clientX, e.clientY);
+      const wx = toWorldX(pt.x);
+      const wy = toWorldY(pt.y);
       inputState.aimAngle = Math.atan2(wy - (player.y - 0.4), wx - player.x);
       inputState.aimMagnitude = 1;
       player.facing = Math.cos(inputState.aimAngle) >= 0 ? 1 : -1;
@@ -1728,8 +1827,9 @@
 
     canvas.addEventListener('pointermove', (e) => {
       if (!canvasMouseAiming || isPaused || isGameOver) return;
-      const wx = toWorldX(e.clientX);
-      const wy = toWorldY(e.clientY);
+      const pt = screenToLogicalPoint(e.clientX, e.clientY);
+      const wx = toWorldX(pt.x);
+      const wy = toWorldY(pt.y);
       inputState.aimAngle = Math.atan2(wy - (player.y - 0.4), wx - player.x);
       player.facing = Math.cos(inputState.aimAngle) >= 0 ? 1 : -1;
     });
@@ -2480,8 +2580,8 @@
     // 9. RENDERING (STEPPE FANTASY ARENA, WIZARDS, SIGIL OVERHEADS & FX)
     // =========================================================================
     function drawBackground() {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
+      const w = logicalViewport.width;
+      const h = logicalViewport.height;
 
       // Twilight Steppe Sky Gradient
       const skyGrad = ctx.createLinearGradient(0, 0, 0, h);
